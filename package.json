@@ -1,0 +1,10 @@
+{
+  "name": "motif-ts-monorepo",
+  "private": true,
+  "scripts": {
+    "motif": "pnpm --filter motif-ts"
+  },
+  "devDependencies": {
+    "pnpm": "^10.19.0"
+  }
+}

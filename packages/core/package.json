@@ -1,0 +1,48 @@
+{
+  "name": "@motif-ts/core",
+  "version": "0.0.0",
+  "description": "",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run --typecheck",
+    "format": "prettier \"**/*.{ts,cjs,mjs,json}\" --write",
+    "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Zhongliang Wang",
+    "url": "https://zhongliang.wang",
+    "email": "hello@zhongliang.wang"
+  },
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
+    "@redux-devtools/extension": "^3.3.0",
+    "@types/react": "^19.2.2",
+    "@vitest/coverage-v8": "4.0.3",
+    "eslint": "^8.57.1",
+    "prettier": "^3.6.2",
+    "react": "^19.2.0",
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^4.0.3",
+    "zustand": "^5.0.8"
+  },
+  "peerDependencies": {
+    "zustand": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "react": "^18.0.0"
+  }
+}
