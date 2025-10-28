@@ -3,24 +3,29 @@ import { type StepAPI, type StepCreatorAny, type StepInstance } from '../step/ty
 
 export type TransitionStatus = 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut';
 
+export type CurrentStepNotStarted = { status: 'notStarted' };
+export type CurrentStepStarted<Creators extends readonly StepCreatorAny[]> = {
+  status: Exclude<TransitionStatus, 'notStarted'>;
+} & {
+  [K in Creators[number]['kind']]: {
+    kind: K;
+    name: string;
+    state: ReturnType<
+      ReturnType<
+        Extract<
+          Creators[number],
+          {
+            kind: K;
+          }
+        >
+      >['build']
+    >;
+  };
+}[Creators[number]['kind']];
+
 export type CurrentStep<Creators extends readonly StepCreatorAny[]> =
-  | { status: 'notStarted' }
-  | ({ status: Exclude<TransitionStatus, 'notStarted'> } & {
-      [K in Creators[number]['kind']]: {
-        kind: K;
-        name: string;
-        state: ReturnType<
-          ReturnType<
-            Extract<
-              Creators[number],
-              {
-                kind: K;
-              }
-            >
-          >['build']
-        >;
-      };
-    }[Creators[number]['kind']]);
+  | CurrentStepNotStarted
+  | CurrentStepStarted<Creators>;
 
 export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**

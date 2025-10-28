@@ -9,7 +9,7 @@ import {
   type StepInstance,
   type TransitionHook,
 } from '../step/types';
-import { type CurrentStep, type TransitionStatus, type WorkflowAPI } from './types';
+import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
 
 // React-like lifecycle context for the current step
 type WorkflowContext = {
@@ -73,7 +73,9 @@ function validateInventory(inventory: readonly StepCreatorAny[]) {
 
   if (dupDetails.length) {
     const details = dupDetails.join(', ');
-    throw new Error(`motif-ts Workflow Inventory contains duplicate Step kinds: ${details}. Each Step kind must be unique.`);
+    throw new Error(
+      `motif-ts Workflow Inventory contains duplicate Step kinds: ${details}. Each Step kind must be unique.`,
+    );
   }
 }
 
@@ -139,12 +141,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     const outCleanupsForBack: CleanupFn[] = [];
     if (current) {
       currentStep = {
-        // @ts-expect-error
-        status: 'transitionOut' as const,
+        status: 'transitionOut',
         kind: current.kind,
         name: current.name,
         state: currentApi,
-      };
+      } as CurrentStepStarted<Creators>;
       notify(current.kind, current.name, 'transitionOut');
     }
     if (context) {
@@ -270,12 +271,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
     currentApi = api;
     currentStep = {
-      // @ts-expect-error
-      status: 'ready' as const,
+      status: 'ready',
       kind: current.kind,
       name: current.name,
       state: currentApi,
-    };
+    } as CurrentStepStarted<Creators>;
     // Notify ready on store-driven rebuild
     notify(node.kind, node.name, 'ready');
   };
@@ -289,12 +289,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     // Do NOT run exit sequence here; it is handled by callers (next/back)
     current = node;
     currentStep = {
-      // @ts-expect-error
-      status: 'transitionIn' as const,
+      status: 'transitionIn',
       kind: current.kind,
       name: current.name,
       state: currentApi,
-    };
+    } as CurrentStepStarted<Creators>;
     // Notify transition entering
     notify(node.kind, node.name, 'transitionIn');
 
@@ -387,12 +386,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
     currentApi = api;
     currentStep = {
-      // @ts-expect-error
       status: 'ready' as const,
       kind: current.kind,
       name: current.name,
       state: currentApi,
-    };
+    } as CurrentStepStarted<Creators>;
     notify(node.kind, node.name, 'ready');
   };
 

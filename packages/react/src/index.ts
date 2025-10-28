@@ -1,7 +1,5 @@
-import { useSyncExternalStore, useDebugValue } from 'react';
-
-import { type StepCreatorAny } from './step/types';
-import { type CurrentStep, type WorkflowAPI } from './workflow/types';
+import { type CurrentStep, type StepCreatorAny, type WorkflowAPI } from '@motif-ts/core';
+import { useDebugValue, useSyncExternalStore } from 'react';
 
 const getCurrentStepServerSide: () => CurrentStep<[]> = () => ({
   status: 'notStarted',

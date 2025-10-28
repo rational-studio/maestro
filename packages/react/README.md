@@ -1,4 +1,4 @@
-# motif-ts: Workflow Orchestrator
+# Motif-TS: Workflow Orchestrator
 **Dead Simple. Fully Typed. Effortlessly Orchestrated**
 
 ---
@@ -154,7 +154,7 @@ unsub();
 ## React Integration
 
 ```ts
-import { useWorkflow } from '@motif-ts/react';
+import { useWorkflow } from '@motif-js/core/react';
 
 function App({ orchestrator }: { orchestrator: workflow<[typeof S, typeof T]> }) {
   const current = useWorkflow(orchestrator);

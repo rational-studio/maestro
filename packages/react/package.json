@@ -1,5 +1,5 @@
 {
-  "name": "@motif-ts/core",
+  "name": "@motif-ts/react",
   "version": "0.0.0",
   "description": "",
   "types": "./src/index.ts",
@@ -21,19 +21,20 @@
   "license": "MIT",
   "type": "module",
   "devDependencies": {
+    "@motif-ts/core": "workspace:*",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
+    "@types/react": "^19.2.2",
     "@vitest/coverage-v8": "4.0.3",
     "eslint": "^8.57.1",
     "prettier": "^3.6.2",
+    "react": "^19.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
-    "vitest": "^4.0.3",
-    "zod": "^4.1.12",
-    "zustand": "^5.0.8"
+    "vitest": "^4.0.3"
   },
   "peerDependencies": {
-    "zod": "^4.0.0",
-    "zustand": "^5.0.0"
+    "@motif-ts/core": "workspace:*",
+    "react": "^19.0.0"
   }
 }
