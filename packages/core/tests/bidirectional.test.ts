@@ -104,7 +104,7 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
     expect(logs.filter((l) => l === 'B_effect_cleanup').length).toBe(1);
   });
 
-  it('handles errors in hooks and still maintains state consistency', () => {
+  it('throws errors in hooks and caller must handle them', () => {
     const logs: string[] = [];
 
     const A = Step(
@@ -115,18 +115,14 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
       ({ transitionIn, transitionOut, next }) => {
         transitionIn(() => {
           logs.push('A_in');
-          // Throw inside cleanup to test error swallowing
           return () => {
             logs.push('A_in_cleanup');
+            throw new Error('in cleanup error');
           };
         });
         transitionOut(() => {
           logs.push('A_out');
-          // Throw inside out-hook cleanup
-          return () => {
-            logs.push('A_out_cleanup');
-            throw new Error('out cleanup error');
-          };
+          throw new Error('out hook error');
         });
         return {
           go: () => next(1),
@@ -143,6 +139,7 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
       ({ transitionIn, input }) => {
         transitionIn(() => {
           logs.push('B_in:' + input);
+          throw new Error('B in hook error');
         });
         return {
           whoami: () => 'B',
@@ -159,18 +156,10 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
     orchestrator.start(a);
     const stepA = orchestrator.getCurrentStep();
     assert(stepA.status === 'ready' && stepA.kind === 'A');
-    stepA.state.go();
-
-    const stepB = orchestrator.getCurrentStep();
-    assert(stepB.status === 'ready' && stepB.kind === 'B');
-    expect(stepB.state.whoami()).toBe('B');
-
-    // Back to A to trigger A's transitionOut cleanup
-    orchestrator.back();
-
-    // Ensure errors were swallowed and logs still recorded
-    expect(logs).toContain('A_in_cleanup');
-    expect(logs).toContain('A_out_cleanup');
-    expect(logs.some((l) => l.startsWith('B_in:')).toString()).toBe('true');
+    // Forward to B: A.transitionOut throws
+    expect(() => stepA.state.go()).toThrow('out hook error');
+    // Ensure logs recorded before throws
+    expect(logs).toContain('A_in');
+    expect(logs).toContain('A_out');
   });
 });

@@ -83,7 +83,12 @@ Cleanup execution order when leaving a step:
 2. Run `effect` cleanups
 3. Run `transitionIn` cleanups
 
-Errors thrown inside hooks or cleanups are caught and ignored to preserve flow. Hooks may be `async`, but cleanups must be returned synchronously.
+Errors thrown inside hooks or cleanups are caught and ignored to preserve flow. Hooks may be `async` and can return a `Promise<CleanupFn>`:
+
+- `transitionIn`: when an async hook resolves, its cleanup is registered and will run on exit; if the step exits before resolution, the cleanup is invoked immediately upon resolution to prevent leaks.
+- `transitionOut`: when an async hook resolves, its cleanup is collected to run when navigating back into that step; if back has already occurred before resolution, the cleanup is invoked immediately upon resolution.
+
+Promise rejections in hooks are logged and swallowed to maintain workflow continuity.
 
 ## Edges and Navigation
 

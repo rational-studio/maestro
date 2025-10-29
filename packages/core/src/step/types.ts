@@ -1,10 +1,15 @@
 import { type ZodType } from 'zod';
 import { type StateCreator, type StoreApi, type StoreMutatorIdentifier } from 'zustand/vanilla';
 
+import { type CLEANUP_ARRAY_EXECUTED } from './constants';
+
 export type CleanupFn = void | (() => void);
 
-// Transition hooks are synchronous and return an optional cleanup function.
-export type TransitionHook = () => CleanupFn;
+export type CleanupFnArray = CleanupFn[] & { [CLEANUP_ARRAY_EXECUTED]?: boolean };
+
+// Transition hooks may be synchronous or asynchronous and return an optional cleanup function.
+// Async hooks should resolve to a cleanup function; rejection is handled by the workflow runtime.
+export type TransitionHook = () => CleanupFn | Promise<CleanupFn>;
 
 export type DependencyList = readonly unknown[];
 

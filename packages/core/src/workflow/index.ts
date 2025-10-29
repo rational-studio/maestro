@@ -1,8 +1,10 @@
 import { edge } from '../edge';
 import { type Edge } from '../edge/type';
+import { CLEANUP_ARRAY_EXECUTED } from '../step/constants';
 import {
   type BuildArgs,
   type CleanupFn,
+  type CleanupFnArray,
   type DependencyList,
   type StepAPI,
   type StepCreatorAny,
@@ -10,6 +12,23 @@ import {
   type TransitionHook,
 } from '../step/types';
 import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
+
+function safeInvokeCleanup(fn: CleanupFn) {
+  if (typeof fn === 'function') {
+    fn();
+  }
+}
+
+function isPromise<T = unknown>(value: any): value is Promise<T> {
+  return !!value && typeof value.then === 'function';
+}
+
+function handleAsyncError(err: unknown, phase: 'transitionIn' | 'transitionOut', hookIndex: number) {
+  // Non-throwing error handling to preserve workflow continuity
+  const msg = err instanceof Error ? err.message : String(err);
+  // eslint-disable-next-line no-console
+  console.warn(`[motif-ts] ${phase} hook #${hookIndex} rejected: ${msg}`);
+}
 
 // React-like lifecycle context for the current step
 type WorkflowContext = {
@@ -25,16 +44,16 @@ type WorkflowContext = {
   storeUnsub?: () => void;
   // current input for this step
   currentInput?: any;
+  // version token to guard async resolutions against stale contexts
+  version: number;
 };
 
-function runOutCleanupOnBack(cleanups: CleanupFn[]) {
+function runOutCleanupOnBack(cleanups: CleanupFnArray) {
   for (const cleanup of cleanups) {
-    try {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    } catch {}
+    safeInvokeCleanup(cleanup);
   }
+  // Mark array as executed so late async cleanups resolve immediately
+  cleanups[CLEANUP_ARRAY_EXECUTED] = true;
 }
 
 function shallowEqual(a?: DependencyList, b?: DependencyList): boolean {
@@ -96,6 +115,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   let current: StepInstance<any, any, any, any, any> | undefined;
   let currentApi: StepAPI | undefined;
   let context: WorkflowContext | undefined;
+  let contextVersionCounter = 0;
 
   // Validate duplicate kinds with detailed error information
   validateInventory(inventory);
@@ -124,21 +144,37 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       return;
     }
     context.inCleanups = [];
-    for (const hook of context.inHooks) {
-      try {
-        const result = hook();
-        if (typeof result === 'function') {
-          context.inCleanups.push(result);
-        }
-      } catch {}
+    const version = context.version;
+    for (let i = 0; i < context.inHooks.length; i++) {
+      const hook = context.inHooks[i];
+      const result = hook();
+      if (typeof result === 'function') {
+        context.inCleanups.push(result);
+      } else if (isPromise<CleanupFn>(result)) {
+        result
+          .then((cleanup) => {
+            if (typeof cleanup !== 'function') {
+              return;
+            }
+            // If context is still current, register; otherwise, invoke immediately
+            if (context && context.version === version) {
+              context.inCleanups.push(cleanup);
+            } else {
+              safeInvokeCleanup(cleanup);
+            }
+          })
+          .catch((err) => handleAsyncError(err, 'transitionIn', i));
+      }
     }
     context.hasRunIn = true;
   };
 
   // Exit sequence: run transitionOut hooks (once, before exit), collect their cleanups to run when coming back.  134   const runExitSequence = (): CleanupFn[] => {
   // Also run effect cleanups and transitionIn cleanups immediately.
-  const runExitSequence = (): CleanupFn[] => {
-    const outCleanupsForBack: CleanupFn[] = [];
+  const runExitSequence = (): CleanupFnArray => {
+    const outCleanupsForBack: CleanupFnArray = [];
+    // mark as not yet executed; used to flush late async cleanups
+    outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] = false;
     if (current) {
       currentStep = {
         status: 'transitionOut',
@@ -149,10 +185,26 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       notify(current.kind, current.name, 'transitionOut');
     }
     if (context) {
-      for (const hook of context.outHooks) {
+      for (let i = 0; i < context.outHooks.length; i++) {
+        const hook = context.outHooks[i];
         const result = hook();
         if (typeof result === 'function') {
           outCleanupsForBack.push(result);
+        } else if (isPromise<CleanupFn>(result)) {
+          result
+            .then((cleanup) => {
+              if (typeof cleanup !== 'function') {
+                return;
+              }
+              // If back has already executed for this array, invoke immediately; else collect
+              const executed = outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] === true;
+              if (executed) {
+                safeInvokeCleanup(cleanup);
+              } else {
+                outCleanupsForBack.push(cleanup);
+              }
+            })
+            .catch((err) => handleAsyncError(err, 'transitionOut', i));
         }
       }
       for (const eff of context.effects) {
@@ -161,9 +213,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         }
       }
       for (const cleanup of context.inCleanups) {
-        if (typeof cleanup === 'function') {
-          cleanup();
-        }
+        safeInvokeCleanup(cleanup);
       }
       context.storeUnsub?.();
       context = undefined;
@@ -230,6 +280,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         effects: [],
         storeUnsub: undefined,
         currentInput: inputForNode,
+        version: ++contextVersionCounter,
       };
     } else {
       context.outHooks = outHooks;
@@ -244,9 +295,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       const def = effectsDefs[i];
       if (!def) {
         if (prev && typeof prev.cleanup === 'function') {
-          try {
-            prev.cleanup();
-          } catch {}
+          prev.cleanup();
         }
         continue;
       }
@@ -254,14 +303,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       if (shouldRun) {
         // cleanup previous first
         if (prev && typeof prev.cleanup === 'function') {
-          try {
-            prev.cleanup();
-          } catch {}
+          prev.cleanup();
         }
-        let cleanup: CleanupFn = undefined;
-        try {
-          cleanup = def.run() || undefined;
-        } catch {}
+        const cleanup = def.run();
         nextEffects[i] = { deps: def.deps, run: def.run, cleanup };
       } else {
         nextEffects[i] = { deps: def.deps, run: def.run, cleanup: prev?.cleanup };
@@ -297,8 +341,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     // Notify transition entering
     notify(node.kind, node.name, 'transitionIn');
 
-    if (isBack && backCleanups.length > 0) {
+    if (isBack) {
       // execute transitionOut cleanups of the step we are returning to
+      // even if none are present yet; late async cleanups will flush immediately
       runOutCleanupOnBack(backCleanups);
     }
 
@@ -360,6 +405,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       effects: [],
       storeUnsub: undefined,
       currentInput: input,
+      version: ++contextVersionCounter,
     };
     // Execute transitionIn once
     runTransitionInOnce();
@@ -368,10 +414,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     const nextEffects: Array<{ deps?: DependencyList; run: () => CleanupFn; cleanup?: CleanupFn }> = [];
     for (let i = 0; i < effectsDefs.length; i++) {
       const def = effectsDefs[i];
-      let cleanup: CleanupFn = undefined;
-      try {
-        cleanup = def.run() || undefined;
-      } catch {}
+      const cleanup: CleanupFn = def.run();
       nextEffects[i] = { deps: def.deps, run: def.run, cleanup };
     }
     context.effects = nextEffects;
