@@ -1,7 +1,7 @@
 {
   "name": "@motif-ts/react",
   "version": "0.0.0",
-  "description": "",
+  "description": "React bindings for motif-ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -24,14 +24,14 @@
     "@motif-ts/core": "workspace:*",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@types/react": "^19.2.2",
-    "@vitest/coverage-v8": "4.0.5",
+    "@vitest/coverage-v8": "4.0.6",
     "eslint": "^9.38.0",
     "@eslint/js": "^9.38.0",
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
-    "vitest": "^4.0.5"
+    "vitest": "^4.0.6"
   },
   "peerDependencies": {
     "@motif-ts/core": "workspace:*",

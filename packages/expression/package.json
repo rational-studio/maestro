@@ -1,7 +1,7 @@
 {
-  "name": "@motif-ts/core",
+  "name": "@motif-ts/expression",
   "version": "0.0.0",
-  "description": "motif-ts: Workflow Orchestrator",
+  "description": "JavaScript expression parser and evaluator",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -28,15 +28,6 @@
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
-    "vitest": "^4.0.6",
-    "zod": "^4.1.12",
-    "zustand": "^5.0.8"
-  },
-  "peerDependencies": {
-    "zod": "^4.0.0",
-    "zustand": "^5.0.0"
-  },
-  "dependencies": {
-    "@motif-ts/expression": "workspace:*"
+    "vitest": "^4.0.6"
   }
 }

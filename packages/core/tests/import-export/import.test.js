@@ -16,10 +16,10 @@ describe('Import workflow - basic and full', () => {
       libraryVersion: undefined,
       inventoryKinds: ['A', 'B'],
       nodes: [
-        { id: 'A_a', kind: 'A', name: 'a' },
-        { id: 'B_b', kind: 'B', name: 'b' },
+        { id: 'A_a', kind: 'A', name: 'a', config: undefined },
+        { id: 'B_b', kind: 'B', name: 'b', config: undefined },
       ],
-      edges: [{ from: 'A_a', to: 'B_b', unidirectional: false }],
+      edges: [{ kind: 'default', from: 'A_a', to: 'B_b', unidirectional: false }],
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://motif-ts.dev/schemas/workflow-export.json',
     };
@@ -41,10 +41,10 @@ describe('Import workflow - basic and full', () => {
       libraryVersion: undefined,
       inventoryKinds: ['S', 'T'],
       nodes: [
-        { id: 'S_s', kind: 'S', name: 's' },
-        { id: 'T_t', kind: 'T', name: 't' },
+        { id: 'S_s', kind: 'S', name: 's', config: undefined },
+        { id: 'T_t', kind: 'T', name: 't', config: undefined },
       ],
-      edges: [{ from: 'S_s', to: 'T_t', unidirectional: false }],
+      edges: [{ kind: 'default', from: 'S_s', to: 'T_t', unidirectional: false }],
       state: {
         current: { nodeId: 'S_s', status: 'ready', input: undefined },
         history: [{ nodeId: 'S_s', input: undefined }],
@@ -93,7 +93,7 @@ describe('Import workflow - basic and full', () => {
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
       inventoryKinds: ['A'],
       nodes: [{ id: 'A_a', kind: 'A', name: 'a' }],
-      edges: [{ from: 'A_a', to: 'B_b', unidirectional: false }],
+      edges: [{ kind: 'default', from: 'A_a', to: 'B_b', unidirectional: false }],
     };
     expect(() => wf.importWorkflow(bad, 'basic')).toThrow();
   });

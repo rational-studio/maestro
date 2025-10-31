@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import z from 'zod';
-import { step, workflow } from '../../src';
+import { step, workflow, conditionalEdge, transformEdge } from '../../src';
 import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/types';
 
 describe('Export workflow - basic and full', () => {
@@ -42,6 +42,31 @@ describe('Export workflow - basic and full', () => {
     expect(full.schemaVersion).toBe(WORKFLOW_EXPORT_SCHEMA_VERSION);
   });
 
+  it('exports edges with conditional and transform kinds', () => {
+    const Emitter = step({ kind: 'Emitter', outputSchema: z.number() }, ({ next }) => ({ emit: (n) => next(n) }));
+    const Even = step({ kind: 'Even', inputSchema: z.number() }, ({ input }) => ({ val: input }));
+    const Odd = step({ kind: 'Odd', inputSchema: z.number() }, ({ input }) => ({ val: input }));
+    const A = step({ kind: 'A', outputSchema: z.object({ name: z.string(), age: z.number() }) }, ({ next }) => ({ go: (n, a) => next({ name: n, age: a }) }));
+    const B = step({ kind: 'B', inputSchema: z.object({ username: z.string(), years: z.number() }) }, ({ input }) => ({ who: () => input.username + ':' + input.years }));
+
+    const wf = workflow([Emitter, Even, Odd, A, B]);
+    const emitter = Emitter('emitter');
+    const even = Even('even');
+    const odd = Odd('odd');
+    const a = A('a');
+    const b = B('b');
+    wf.register([emitter, even, odd, a, b]);
+    wf.connect(conditionalEdge(emitter, even, 'out % 2 === 0'));
+    wf.connect(conditionalEdge(emitter, odd, 'out % 2 !== 0'));
+    wf.connect(transformEdge(a, b, '{ username: out.name, years: out.age }'));
+
+    const basic = wf.exportWorkflow('basic');
+    expect(basic.edges).toEqual([
+      { kind: 'conditional', from: emitter.id, to: even.id, unidirectional: false, expr: 'out % 2 === 0' },
+      { kind: 'conditional', from: emitter.id, to: odd.id, unidirectional: false, expr: 'out % 2 !== 0' },
+      { kind: 'transform', from: a.id, to: b.id, unidirectional: false, expr: '{ username: out.name, years: out.age }' },
+    ]);
+  });
   it('exports when not started (no current node)', () => {
     const A = step({ kind: 'A' }, () => ({ noop: true }));
     const wf = workflow([A]);

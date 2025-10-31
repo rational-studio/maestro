@@ -1,3 +1,5 @@
+import expression from '@motif-ts/expression';
+
 import { type StepInstance } from '../step/types';
 import { type Edge } from './type';
 
@@ -9,6 +11,7 @@ export function edge<I, O extends I>(
   unidirectional = false,
 ): Edge<I, O> {
   return {
+    kind: 'default',
     from,
     to,
     unidirectional,
@@ -22,15 +25,19 @@ export function edge<I, O extends I>(
 export function conditionalEdge<I, O extends I>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
-  predicate: (outputFrom: O) => boolean,
+  predicateExprSrc: string,
   unidirectional = false,
 ): Edge<I, O> {
+  const compiled = expression(predicateExprSrc);
   return {
+    kind: 'conditional',
     from,
     to,
     unidirectional,
+    exprSrc: predicateExprSrc,
+    compiled,
     validateTransition(outputFrom) {
-      const ok = predicate(outputFrom);
+      const ok = !!compiled({ out: outputFrom });
       return ok ? { allow: true as const, nextInput: outputFrom } : { allow: false as const };
     },
   };
@@ -39,16 +46,24 @@ export function conditionalEdge<I, O extends I>(
 export function transformEdge<I, O>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
-  transformer: (outputFrom: O) => I,
+  transformExprSrc: string,
   unidirectional = false,
 ): Edge<I, O> {
+  const compiled = expression(transformExprSrc);
   return {
+    kind: 'transform',
     from,
     to,
     unidirectional,
+    exprSrc: transformExprSrc,
+    compiled,
     validateTransition(outputFrom) {
       try {
-        const converted = transformer(outputFrom);
+        const convertedRaw = compiled({ out: outputFrom });
+        if (convertedRaw === undefined) {
+          throw new Error('result is undefined');
+        }
+        const converted = convertedRaw as I;
         return { allow: true as const, nextInput: converted };
       } catch (e: any) {
         // Handle conversion errors explicitly

@@ -7,6 +7,7 @@ exports[`Export workflow - basic and full > exports basic configuration with nod
   "edges": [
     {
       "from": "A_a",
+      "kind": "default",
       "to": "B_b",
       "unidirectional": false,
     },
@@ -42,6 +43,7 @@ exports[`Export workflow - basic and full > exports full state including current
   "edges": [
     {
       "from": "S_s",
+      "kind": "default",
       "to": "T_t",
       "unidirectional": false,
     },

@@ -22,9 +22,9 @@ describe('ConditionalEdge: predicate controls transition', () => {
     const even = AcceptEven();
     const odd = AcceptOdd();
     orchestrator.register([emitter, even, odd]);
-    // todo: fix type inference
-    orchestrator.connect(conditionalEdge(emitter, even, (out) => out % 2 === 0));
-    orchestrator.connect(conditionalEdge(emitter, odd, (out) => out % 2 !== 0));
+    // use expression-based predicate referencing env { out }
+    orchestrator.connect(conditionalEdge(emitter, even, 'out % 2 === 0'));
+    orchestrator.connect(conditionalEdge(emitter, odd, 'out % 2 !== 0'));
 
     orchestrator.start(emitter);
     const sA1 = orchestrator.getCurrentStep();

@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { edge } from '../edge';
+
+import { conditionalEdge, edge, transformEdge } from '../edge';
 import { type Edge } from '../edge/type';
-import { type CleanupFn, type StepAPI, type StepInstance, type StepCreatorAny } from '../step/types';
+import { type CleanupFn, type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
 import {
   WORKFLOW_EXPORT_SCHEMA_VERSION,
   type WorkflowExport,
@@ -43,7 +44,29 @@ export function createImportExportHandlers(deps: HandlersDeps) {
 
   // Schemas
   const ZNode = z.object({ id: z.string(), kind: z.string(), name: z.string(), config: z.unknown().optional() });
-  const ZEdge = z.object({ from: z.string(), to: z.string(), unidirectional: z.boolean() });
+  // Support both new and old edge formats for backward compatibility.
+  // Use discriminated union by 'kind' to ensure conditional/transform require 'expr'.
+  const ZEdgeDefault = z.object({
+    kind: z.literal('default'),
+    from: z.string(),
+    to: z.string(),
+    unidirectional: z.boolean(),
+  });
+  const ZEdgeConditional = z.object({
+    kind: z.literal('conditional'),
+    from: z.string(),
+    to: z.string(),
+    unidirectional: z.boolean(),
+    expr: z.string(),
+  });
+  const ZEdgeTransform = z.object({
+    kind: z.literal('transform'),
+    from: z.string(),
+    to: z.string(),
+    unidirectional: z.boolean(),
+    expr: z.string(),
+  });
+  const ZEdge = z.discriminatedUnion('kind', [ZEdgeDefault, ZEdgeConditional, ZEdgeTransform]);
   const ZBase = z.object({
     schemaVersion: z.literal(WORKFLOW_EXPORT_SCHEMA_VERSION),
     libraryVersion: z.string().optional(),
@@ -78,7 +101,28 @@ export function createImportExportHandlers(deps: HandlersDeps) {
       libraryVersion: undefined,
       inventoryKinds: Array.from(inventoryMap.keys()),
       nodes: Array.from(nodes).map((n) => ({ id: n.id, kind: n.kind, name: n.name, config: n.config })),
-      edges: edges.map((e) => ({ from: e.from.id, to: e.to.id, unidirectional: e.unidirectional })),
+      edges: edges.map((e) => {
+        switch (e.kind) {
+          case 'default':
+            return { kind: 'default' as const, from: e.from.id, to: e.to.id, unidirectional: e.unidirectional };
+          case 'conditional':
+            return {
+              kind: 'conditional' as const,
+              from: e.from.id,
+              to: e.to.id,
+              unidirectional: e.unidirectional,
+              expr: e.exprSrc,
+            };
+          case 'transform':
+            return {
+              kind: 'transform' as const,
+              from: e.from.id,
+              to: e.to.id,
+              unidirectional: e.unidirectional,
+              expr: e.exprSrc,
+            };
+        }
+      }),
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://motif-ts.dev/schemas/workflow-export.json',
     };
@@ -103,7 +147,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
           const arr = Array.from(nodes);
           for (let i = 0; i < arr.length; i++) {
             const n = arr[i];
-            const state = n.storeApi ? (n.storeApi as any).getState() : undefined;
+            const state = n.storeApi?.getState();
             if (state !== undefined) {
               obj[n.id] = state;
             }
@@ -173,7 +217,15 @@ export function createImportExportHandlers(deps: HandlersDeps) {
               `Import error: edge references unknown node(s): from='${ed.from}' to='${ed.to}'. Ensure nodes exist.`,
             );
           }
-          nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
+          if (ed.kind === 'default') {
+            nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
+          } else if (ed.kind === 'conditional') {
+            nextEdges.push(conditionalEdge<any, any>(from, to, ed.expr, ed.unidirectional));
+          } else if (ed.kind === 'transform') {
+            nextEdges.push(transformEdge<any, any>(from, to, ed.expr, ed.unidirectional));
+          } else {
+            throw new Error(`Import error: unknown edge kind '${(ed as any).kind}'.`);
+          }
         }
         // Clear runtime state and apply
         runExitSequence();
@@ -228,7 +280,8 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         if (!inst.storeApi) {
           throw new Error(`Import error: node '${nodeId}' does not have a store, but store state provided.`);
         }
-        inst.storeApi.setState(state as any);
+        // Use the parameter type of setState for precise casting
+        inst.storeApi.setState(state as Parameters<typeof inst.storeApi.setState>[0]);
       }
       const nextEdges: Edge<any, any>[] = [];
       for (const ed of parsed.edges) {
@@ -239,9 +292,17 @@ export function createImportExportHandlers(deps: HandlersDeps) {
             `Import error: edge references unknown node(s): from='${ed.from}' to='${ed.to}'. Ensure nodes exist.`,
           );
         }
-        nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
+        if (ed.kind === 'default') {
+          nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
+        } else if (ed.kind === 'conditional') {
+          nextEdges.push(conditionalEdge<any, any>(from, to, ed.expr, ed.unidirectional));
+        } else if (ed.kind === 'transform') {
+          nextEdges.push(transformEdge<any, any>(from, to, ed.expr, ed.unidirectional));
+        } else {
+          throw new Error(`Import error: unknown edge kind '${(ed as any).kind}'.`);
+        }
       }
-      const nextHistory: typeof history = [] as any;
+      const nextHistory: typeof history = [];
       for (const h of parsed.state.history) {
         const inst = nextNodesById.get(h.nodeId);
         if (!inst) {

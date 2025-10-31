@@ -41,11 +41,28 @@ export interface WorkflowExportBase {
     name: string;
     config?: unknown;
   }>;
-  edges: Array<{
-    from: string;
-    to: string;
-    unidirectional: boolean;
-  }>;
+  edges: Array<
+    | {
+        kind: 'default';
+        from: string;
+        to: string;
+        unidirectional: boolean;
+      }
+    | {
+        kind: 'conditional';
+        from: string;
+        to: string;
+        unidirectional: boolean;
+        expr: string;
+      }
+    | {
+        kind: 'transform';
+        from: string;
+        to: string;
+        unidirectional: boolean;
+        expr: string;
+      }
+  >;
 }
 
 // Basic configuration export structure

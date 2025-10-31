@@ -32,7 +32,7 @@ describe('Error handling and edge cases', () => {
         { id: 'A_a', kind: 'A', name: 'a' },
         { id: 'B_b', kind: 'B', name: 'b' },
       ],
-      edges: [{ from: 'A_a', to: 'B_b', unidirectional: false }],
+      edges: [{ kind: 'default', from: 'A_a', to: 'B_b', unidirectional: false }],
     };
 
     // Attempt import and ensure rollback works

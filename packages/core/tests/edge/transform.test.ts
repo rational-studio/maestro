@@ -18,8 +18,8 @@ describe('TransformEdge: converts A output to B input type', () => {
     const b = B();
     orchestrator.register([a, b]);
 
-    // Inline converter
-    orchestrator.connect(transformEdge(a, b, (out) => ({ username: out.name, years: out.age })));
+    // Inline converter via expression
+    orchestrator.connect(transformEdge(a, b, '{ username: out.name, years: out.age }'));
     orchestrator.start(a);
     const sA1 = orchestrator.getCurrentStep();
     assert(sA1.status === 'ready' && sA1.kind === 'A');
@@ -43,17 +43,14 @@ describe('TransformEdge: converts A output to B input type', () => {
     const a = A();
     const b = B();
     orchestrator.register([a, b]);
-    orchestrator.connect(
-      transformEdge(a, b, () => {
-        throw new Error('bad convert');
-      }),
-    );
+    // Expression that results in undefined triggers transform error
+    orchestrator.connect(transformEdge(a, b, 'undefined'));
 
     orchestrator.start(a);
     const sA = orchestrator.getCurrentStep();
     assert(sA.status === 'ready' && sA.kind === 'A');
     expect(() => sA.state.go('alice', 20)).toThrow(
-      'TransformEdge: failed to convert output -> input. Reason: bad convert',
+      'TransformEdge: failed to convert output -> input. Reason: result is undefined',
     );
   });
 });
