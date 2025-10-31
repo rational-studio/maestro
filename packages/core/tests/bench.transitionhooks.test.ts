@@ -53,7 +53,6 @@ describe('Performance: sync vs async TransitionHook', () => {
     await Promise.resolve();
     const endAsync = perf.now();
 
-    // eslint-disable-next-line no-console
     console.log(
       `[bench] TransitionIn hooks: sync=${(endSync - startSync).toFixed(2)}ms, async=${(endAsync - startAsync).toFixed(
         2,

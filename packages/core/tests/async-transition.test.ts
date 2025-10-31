@@ -44,7 +44,7 @@ describe('Async TransitionHook support', () => {
   it('swallows rejected async hooks with error handling', async () => {
     const errors: string[] = [];
     const originalWarn = console.warn;
-    console.warn = (msg: any) => {
+    console.warn = (msg: unknown) => {
       errors.push(String(msg));
     };
 

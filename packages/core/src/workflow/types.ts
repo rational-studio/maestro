@@ -27,6 +27,51 @@ export type CurrentStep<Creators extends readonly StepCreatorAny[]> =
   | CurrentStepNotStarted
   | CurrentStepStarted<Creators>;
 
+// Export/Import schema version
+export const WORKFLOW_EXPORT_SCHEMA_VERSION = '1.0.0' as const;
+
+// Shared base for exports
+export interface WorkflowExportBase {
+  schemaVersion: typeof WORKFLOW_EXPORT_SCHEMA_VERSION;
+  libraryVersion?: string;
+  inventoryKinds: string[];
+  nodes: Array<{
+    id: string;
+    kind: string;
+    name: string;
+    config?: unknown;
+  }>;
+  edges: Array<{
+    from: string;
+    to: string;
+    unidirectional: boolean;
+  }>;
+}
+
+// Basic configuration export structure
+export interface WorkflowExportBasic extends WorkflowExportBase {
+  format: 'motif-ts/basic';
+}
+
+// Full export extends base with runtime state
+export interface WorkflowExportFull extends WorkflowExportBase {
+  format: 'motif-ts/full';
+  state: {
+    current: {
+      nodeId?: string | null;
+      status: TransitionStatus;
+      input?: unknown;
+    };
+    history: Array<{
+      nodeId: string;
+      input?: unknown;
+    }>;
+    stores: Record<string, unknown>;
+  };
+}
+
+export type WorkflowExport = WorkflowExportBasic | WorkflowExportFull;
+
 export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**
    * Register steps to the workflow.
@@ -66,4 +111,15 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Back to the previous step.
    */
   back(): void;
+  /**
+   * Export current workflow configuration or full state to JSON structure.
+   * @param mode 'basic' for nodes/edges only; 'full' for including runtime state and history.
+   */
+  exportWorkflow(mode: 'basic' | 'full'): WorkflowExport;
+  /**
+   * Import workflow configuration or full state from JSON. Operation is atomic; on any error, no changes are applied.
+   * @param data The JSON object to import.
+   * @param mode Must match the export format: 'basic' or 'full'.
+   */
+  importWorkflow(data: WorkflowExport, mode: 'basic' | 'full'): void;
 }

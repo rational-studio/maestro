@@ -5,6 +5,6 @@
     "motif": "pnpm --filter motif-ts"
   },
   "devDependencies": {
-    "pnpm": "^10.19.0"
+    "pnpm": "^10.20.0"
   }
 }

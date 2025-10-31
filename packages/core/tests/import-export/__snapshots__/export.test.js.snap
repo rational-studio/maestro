@@ -1,0 +1,117 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Export workflow - basic and full > exports basic configuration with nodes and edges > basic-export 1`] = `
+{
+  "$id": "https://motif-ts.dev/schemas/workflow-export.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "edges": [
+    {
+      "from": "A_a",
+      "to": "B_b",
+      "unidirectional": false,
+    },
+  ],
+  "format": "motif-ts/basic",
+  "inventoryKinds": [
+    "A",
+    "B",
+  ],
+  "libraryVersion": undefined,
+  "nodes": [
+    {
+      "config": undefined,
+      "id": "A_a",
+      "kind": "A",
+      "name": "a",
+    },
+    {
+      "config": undefined,
+      "id": "B_b",
+      "kind": "B",
+      "name": "b",
+    },
+  ],
+  "schemaVersion": "1.0.0",
+}
+`;
+
+exports[`Export workflow - basic and full > exports full state including current, history and stores > full-export 1`] = `
+{
+  "$id": "https://motif-ts.dev/schemas/workflow-export.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "edges": [
+    {
+      "from": "S_s",
+      "to": "T_t",
+      "unidirectional": false,
+    },
+  ],
+  "format": "motif-ts/full",
+  "inventoryKinds": [
+    "S",
+    "T",
+  ],
+  "libraryVersion": undefined,
+  "nodes": [
+    {
+      "config": {
+        "v": 42,
+      },
+      "id": "S_s",
+      "kind": "S",
+      "name": "s",
+    },
+    {
+      "config": undefined,
+      "id": "T_t",
+      "kind": "T",
+      "name": "t",
+    },
+  ],
+  "schemaVersion": "1.0.0",
+  "state": {
+    "current": {
+      "input": undefined,
+      "nodeId": "S_s",
+      "status": "ready",
+    },
+    "history": [],
+    "stores": {
+      "S_s": {
+        "v": 0,
+      },
+    },
+  },
+}
+`;
+
+exports[`Export workflow - basic and full > exports when not started (no current node) > full-export-not-started 1`] = `
+{
+  "$id": "https://motif-ts.dev/schemas/workflow-export.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "edges": [],
+  "format": "motif-ts/full",
+  "inventoryKinds": [
+    "A",
+  ],
+  "libraryVersion": undefined,
+  "nodes": [
+    {
+      "config": undefined,
+      "id": "A_a",
+      "kind": "A",
+      "name": "a",
+    },
+  ],
+  "schemaVersion": "1.0.0",
+  "state": {
+    "current": {
+      "input": undefined,
+      "nodeId": null,
+      "status": "notStarted",
+    },
+    "history": [],
+    "stores": {},
+  },
+}
+`;

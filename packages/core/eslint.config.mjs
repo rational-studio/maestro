@@ -1,18 +1,25 @@
 // @ts-check
-/* eslint-env node */
-/** @type {import('eslint').Linter.LegacyConfig} */
-module.exports = {
-  env: {
-    browser: true,
-    es2018: true,
+import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig({
+  name: 'language-options',
+  files: ['**/*.ts'],
+  plugins: {
+    '@typescript-eslint': tseslint.plugin,
   },
-  globals: {
-    process: 'readonly',
-  },
-  parser: '@typescript-eslint/parser',
-  plugins: ['@typescript-eslint'],
-  parserOptions: {
-    project: './tsconfig.json',
+  languageOptions: {
+    parser: tseslint.parser,
+    ecmaVersion: 2018,
+    sourceType: 'module',
+    parserOptions: {
+      project: true,
+      projectService: true,
+      tsconfigRootDir: import.meta.dirname,
+    },
+    globals: {
+      process: 'readonly',
+    },
   },
   rules: {
     curly: ['error', 'all'],
@@ -32,5 +39,4 @@ module.exports = {
     '@typescript-eslint/no-unnecessary-type-constraint': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
   },
-  root: true,
-};
+});
