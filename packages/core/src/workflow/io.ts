@@ -1,6 +1,6 @@
 import type z from 'zod/v4';
 
-import { type Edge } from '../edge/type';
+import { type EdgeInstance } from '../edge/type';
 import { type CleanupFn, type StepAPI, type StepInstance } from '../step/types';
 import { SchemaBasic, SchemaEdge, SchemaFullState, WORKFLOW_EXPORT_SCHEMA_VERSION } from './constants';
 
@@ -11,7 +11,7 @@ type WorkflowExportFull = z.infer<typeof SchemaFullState>;
 type HandlersDeps = {
   inventoryMap: Map<string, any>;
   nodes: Set<StepInstance<any, any, any, any, any>>;
-  edges: Edge<any, any>[];
+  edges: EdgeInstance<any, any>[];
   history: Array<{ node: StepInstance<any, any, any, any, any>; input: unknown; outCleanupOnBack: CleanupFn[] }>;
   getCurrentStep: () => { status: 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut' } | any;
   getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
@@ -136,7 +136,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
           }
           nextNodesById.set(nd.id, instance);
         }
-        const nextEdges: Edge<any, any>[] = [];
+        const nextEdges: EdgeInstance<any, any>[] = [];
         for (const ed of parsed.edges) {
           const from = nextNodesById.get(ed.from);
           const to = nextNodesById.get(ed.to);
@@ -203,7 +203,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         // Use the parameter type of setState for precise casting
         inst.storeApi.setState(state as Parameters<typeof inst.storeApi.setState>[0]);
       }
-      const nextEdges: Edge<any, any>[] = [];
+      const nextEdges: EdgeInstance<any, any>[] = [];
       for (const ed of parsed.edges) {
         const from = nextNodesById.get(ed.from);
         const to = nextNodesById.get(ed.to);

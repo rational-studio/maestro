@@ -1,5 +1,5 @@
 import { edge } from '../edge';
-import { type Edge } from '../edge/type';
+import { type EdgeInstance } from '../edge/type';
 import { CLEANUP_ARRAY_EXECUTED } from '../step/constants';
 import {
   type BuildArgs,
@@ -21,7 +21,7 @@ import { validateInventory } from './validators';
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
   const inventoryMap: Map<string, StepCreatorAny> = new Map();
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
-  const edges: Edge<any, any>[] = [];
+  const edges: EdgeInstance<any, any>[] = [];
   const history: Array<{
     node: StepInstance<any, any, any, any, any>;
     input: unknown;
@@ -171,7 +171,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       next: (output) => {
         const validatedOutput = node.outputSchema ? node.outputSchema.parse(output) : undefined;
         const outgoing = edges.filter((e) => e.from === node);
-        const selected: Edge<any, any> | undefined = outgoing[0];
+        const selected: EdgeInstance<any, any> | undefined = outgoing[0];
         if (!selected) {
           const prevOutCleanups = runExitSequence();
           history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
@@ -256,12 +256,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         throw new Error('No next step');
       }
       // Try each outgoing edge and pick the first that allows transition
-      let selectedEdge: Edge<Output, any> | undefined;
+      let selectedEdge: EdgeInstance<Output, any> | undefined;
       let nextInput = undefined;
       for (const e of outgoing) {
         const res = e.validateTransition(validatedOutput);
         if (res.allow) {
-          selectedEdge = e as Edge<Output, any>;
+          selectedEdge = e as EdgeInstance<Output, any>;
           nextInput = res.nextInput;
           break;
         }
@@ -341,7 +341,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const connect = <I, O>(
-    fromOrEdge: StepInstance<any, O, any, any, any> | Edge<I, O>,
+    fromOrEdge: StepInstance<any, O, any, any, any> | EdgeInstance<I, O>,
     to?: StepInstance<I, any, any, any, any>,
     unidirectional = false,
   ): void => {
@@ -360,7 +360,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       const e = edge<any, any>(from, to, unidirectional);
       edges.push(e);
     } else {
-      const e = fromOrEdge as Edge<I, O>;
+      const e = fromOrEdge as EdgeInstance<I, O>;
       if (!nodes.has(e.from)) {
         throw new Error(
           `Cannot connect from unregistered StepInstance '${e.from.id}'. Register the instance before connecting.`,

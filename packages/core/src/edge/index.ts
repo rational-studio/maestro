@@ -1,7 +1,7 @@
 import expression from '@motif-ts/expression';
 
 import { type StepInstance } from '../step/types';
-import { type Edge } from './type';
+import { type EdgeInstance } from './type';
 
 // BidirectionalEdge: default connector allowing forward and backward transitions
 // Use when connectingA, B) without specifying edge type.
@@ -9,7 +9,7 @@ export function edge<I, O extends I>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
   unidirectional = false,
-): Edge<I, O> {
+): EdgeInstance<I, O> {
   return {
     kind: 'default',
     from,
@@ -19,9 +19,6 @@ export function edge<I, O extends I>(
       // Pass-through without transformation; types are compatible (O extends I)
       return { allow: true, nextInput: outputFrom };
     },
-    serialize() {
-      return { kind: 'default', from: this.from.id, to: this.to.id, unidirectional: this.unidirectional };
-    },
   };
 }
 
@@ -30,7 +27,7 @@ export function conditionalEdge<I, O extends I>(
   to: StepInstance<I, any, any, any, any>,
   predicateExprSrc: string,
   unidirectional = false,
-): Edge<I, O> {
+): EdgeInstance<I, O> {
   const compiled = expression(predicateExprSrc);
   return {
     kind: 'conditional',
@@ -41,15 +38,6 @@ export function conditionalEdge<I, O extends I>(
       const ok = !!compiled({ out: outputFrom });
       return ok ? { allow: true as const, nextInput: outputFrom } : { allow: false as const };
     },
-    serialize() {
-      return {
-        kind: 'conditional',
-        from: this.from.id,
-        to: this.to.id,
-        unidirectional: this.unidirectional,
-        expr: predicateExprSrc,
-      };
-    },
   };
 }
 
@@ -58,7 +46,7 @@ export function transformEdge<I, O>(
   to: StepInstance<I, any, any, any, any>,
   transformExprSrc: string,
   unidirectional = false,
-): Edge<I, O> {
+): EdgeInstance<I, O> {
   const compiled = expression(transformExprSrc);
   return {
     kind: 'transform',
@@ -78,15 +66,6 @@ export function transformEdge<I, O>(
         const msg = e?.message ?? String(e);
         throw new Error(`TransformEdge: failed to convert output -> input. Reason: ${msg}`);
       }
-    },
-    serialize() {
-      return {
-        kind: 'transform',
-        from: this.from.id,
-        to: this.to.id,
-        unidirectional: this.unidirectional,
-        expr: transformExprSrc,
-      };
     },
   };
 }
