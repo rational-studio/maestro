@@ -21,7 +21,7 @@ See `tests/` for comprehensive, deterministic examples.
 ## Quick Start
 
 ```ts
-import z from 'zod';
+import z from 'zod/v4';
 import { workflow, step } from '@motif-ts/core';
 
 // Define steps

@@ -1,4 +1,4 @@
-import { type ZodType } from 'zod';
+import { type ZodType } from 'zod/v4';
 import { type StateCreator, type StoreApi, type StoreMutatorIdentifier } from 'zustand/vanilla';
 
 import { type CLEANUP_ARRAY_EXECUTED } from './constants';

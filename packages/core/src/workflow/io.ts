@@ -1,14 +1,12 @@
-import { z } from 'zod';
+import type z from 'zod/v4';
 
-import { conditionalEdge, edge, transformEdge } from '../edge';
 import { type Edge } from '../edge/type';
-import { type CleanupFn, type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
-import {
-  WORKFLOW_EXPORT_SCHEMA_VERSION,
-  type WorkflowExport,
-  type WorkflowExportBasic,
-  type WorkflowExportFull,
-} from './types';
+import { type CleanupFn, type StepAPI, type StepInstance } from '../step/types';
+import { SchemaBasic, SchemaEdge, SchemaFullState, WORKFLOW_EXPORT_SCHEMA_VERSION } from './constants';
+
+type WorkflowExport = z.infer<typeof SchemaBasic | typeof SchemaFullState>;
+type WorkflowExportBasic = z.infer<typeof SchemaBasic>;
+type WorkflowExportFull = z.infer<typeof SchemaFullState>;
 
 type HandlersDeps = {
   inventoryMap: Map<string, any>;
@@ -20,9 +18,9 @@ type HandlersDeps = {
   getContext: () => any;
   setNotStarted: () => void;
   runExitSequence: () => CleanupFn[];
-  transitionInto: <I, O, C, Api extends StepAPI, Store>(
-    node: StepInstance<I, O, C, Api, Store>,
-    input: I,
+  transitionInto: <Input, Output, Config, Api extends StepAPI, Store>(
+    node: StepInstance<Input, Output, Config, Api, Store>,
+    input: Input,
     isBack: boolean,
     backCleanups: CleanupFn[],
   ) => void;
@@ -42,93 +40,21 @@ export function createImportExportHandlers(deps: HandlersDeps) {
     transitionInto,
   } = deps;
 
-  // Schemas
-  const ZNode = z.object({ id: z.string(), kind: z.string(), name: z.string(), config: z.unknown().optional() });
-  // Support both new and old edge formats for backward compatibility.
-  // Use discriminated union by 'kind' to ensure conditional/transform require 'expr'.
-  const ZEdgeDefault = z.object({
-    kind: z.literal('default'),
-    from: z.string(),
-    to: z.string(),
-    unidirectional: z.boolean(),
-  });
-  const ZEdgeConditional = z.object({
-    kind: z.literal('conditional'),
-    from: z.string(),
-    to: z.string(),
-    unidirectional: z.boolean(),
-    expr: z.string(),
-  });
-  const ZEdgeTransform = z.object({
-    kind: z.literal('transform'),
-    from: z.string(),
-    to: z.string(),
-    unidirectional: z.boolean(),
-    expr: z.string(),
-  });
-  const ZEdge = z.discriminatedUnion('kind', [ZEdgeDefault, ZEdgeConditional, ZEdgeTransform]);
-  const ZBase = z.object({
-    schemaVersion: z.literal(WORKFLOW_EXPORT_SCHEMA_VERSION),
-    libraryVersion: z.string().optional(),
-    inventoryKinds: z.array(z.string()),
-    nodes: z.array(ZNode),
-    edges: z.array(ZEdge),
-    $schema: z.string().optional(),
-    $id: z.string().optional(),
-  });
-  const ZBasic = ZBase.extend({ format: z.literal('motif-ts/basic') });
-  const ZFull = ZBase.extend({
-    format: z.literal('motif-ts/full'),
-    state: z.object({
-      current: z.object({
-        nodeId: z.string().nullable().optional(),
-        status: z.union([
-          z.literal('notStarted'),
-          z.literal('transitionIn'),
-          z.literal('ready'),
-          z.literal('transitionOut'),
-        ]),
-        input: z.any().optional(),
-      }),
-      history: z.array(z.object({ nodeId: z.string(), input: z.any().optional() })),
-      stores: z.record(z.string(), z.any()),
-    }),
-  });
-
-  const exportWorkflow = (mode: 'basic' | 'full'): WorkflowExport => {
+  function exportWorkflow(mode: 'basic'): WorkflowExportBasic;
+  function exportWorkflow(mode: 'full'): WorkflowExportFull;
+  function exportWorkflow(mode: 'basic' | 'full'): WorkflowExport {
     const base: Omit<WorkflowExportBasic, 'format'> & { $schema: string; $id: string } = {
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
       libraryVersion: undefined,
       inventoryKinds: Array.from(inventoryMap.keys()),
       nodes: Array.from(nodes).map((n) => ({ id: n.id, kind: n.kind, name: n.name, config: n.config })),
-      edges: edges.map((e) => {
-        switch (e.kind) {
-          case 'default':
-            return { kind: 'default' as const, from: e.from.id, to: e.to.id, unidirectional: e.unidirectional };
-          case 'conditional':
-            return {
-              kind: 'conditional' as const,
-              from: e.from.id,
-              to: e.to.id,
-              unidirectional: e.unidirectional,
-              expr: e.exprSrc,
-            };
-          case 'transform':
-            return {
-              kind: 'transform' as const,
-              from: e.from.id,
-              to: e.to.id,
-              unidirectional: e.unidirectional,
-              expr: e.exprSrc,
-            };
-        }
-      }),
+      edges: edges.map((e) => e.serialize()),
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://motif-ts.dev/schemas/workflow-export.json',
     };
     if (mode === 'basic') {
       const payload: WorkflowExportBasic = { format: 'motif-ts/basic', ...base };
-      ZBasic.parse(payload);
+      SchemaBasic.parse(payload);
       return payload;
     }
     const currentNodeId = getCurrentNode()?.id ?? null;
@@ -156,11 +82,13 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         })(),
       },
     };
-    ZFull.parse(payload);
+    SchemaFullState.parse(payload);
     return payload;
-  };
+  }
 
-  const importWorkflow = (data: WorkflowExport, mode: 'basic' | 'full') => {
+  function importWorkflow(mode: 'basic', data: WorkflowExportBasic): void;
+  function importWorkflow(mode: 'full', data: WorkflowExportFull): void;
+  function importWorkflow(mode: 'basic' | 'full', data: WorkflowExport): void {
     const oldNodes = Array.from(nodes);
     const oldEdges = edges.slice();
     const oldHistory = history.slice();
@@ -179,7 +107,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
 
     try {
       if (mode === 'basic') {
-        const parsed = ZBasic.parse(data);
+        const parsed = SchemaBasic.parse(data);
         for (const k of parsed.inventoryKinds) {
           if (!inventoryMap.has(k)) {
             throw new Error(`Import error: inventory kind '${k}' not available in current workflow inventory.`);
@@ -217,15 +145,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
               `Import error: edge references unknown node(s): from='${ed.from}' to='${ed.to}'. Ensure nodes exist.`,
             );
           }
-          if (ed.kind === 'default') {
-            nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
-          } else if (ed.kind === 'conditional') {
-            nextEdges.push(conditionalEdge<any, any>(from, to, ed.expr, ed.unidirectional));
-          } else if (ed.kind === 'transform') {
-            nextEdges.push(transformEdge<any, any>(from, to, ed.expr, ed.unidirectional));
-          } else {
-            throw new Error(`Import error: unknown edge kind '${(ed as any).kind}'.`);
-          }
+          // WIP: Add Edge deserialization
         }
         // Clear runtime state and apply
         runExitSequence();
@@ -242,7 +162,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         return;
       }
 
-      const parsed = ZFull.parse(data);
+      const parsed = SchemaFullState.parse(data);
       for (const k of parsed.inventoryKinds) {
         if (!inventoryMap.has(k)) {
           throw new Error(`Import error: inventory kind '${k}' not available in current workflow inventory.`);
@@ -292,15 +212,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
             `Import error: edge references unknown node(s): from='${ed.from}' to='${ed.to}'. Ensure nodes exist.`,
           );
         }
-        if (ed.kind === 'default') {
-          nextEdges.push(edge<any, any>(from, to, ed.unidirectional));
-        } else if (ed.kind === 'conditional') {
-          nextEdges.push(conditionalEdge<any, any>(from, to, ed.expr, ed.unidirectional));
-        } else if (ed.kind === 'transform') {
-          nextEdges.push(transformEdge<any, any>(from, to, ed.expr, ed.unidirectional));
-        } else {
-          throw new Error(`Import error: unknown edge kind '${(ed as any).kind}'.`);
-        }
+        // WIP: Add Edge deserialization
       }
       const nextHistory: typeof history = [];
       for (const h of parsed.state.history) {
@@ -351,7 +263,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
       }
       throw err;
     }
-  };
+  }
 
   return { exportWorkflow, importWorkflow };
 }

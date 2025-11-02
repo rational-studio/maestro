@@ -1,5 +1,8 @@
+import type z from 'zod/v4';
+
 import { type Edge } from '../edge/type';
 import { type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
+import { type SchemaBasic, type SchemaFullState } from './constants';
 
 export type TransitionStatus = 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut';
 
@@ -26,68 +29,6 @@ export type CurrentStepStarted<Creators extends readonly StepCreatorAny[]> = {
 export type CurrentStep<Creators extends readonly StepCreatorAny[]> =
   | CurrentStepNotStarted
   | CurrentStepStarted<Creators>;
-
-// Export/Import schema version
-export const WORKFLOW_EXPORT_SCHEMA_VERSION = '1.0.0' as const;
-
-// Shared base for exports
-export interface WorkflowExportBase {
-  schemaVersion: typeof WORKFLOW_EXPORT_SCHEMA_VERSION;
-  libraryVersion?: string;
-  inventoryKinds: string[];
-  nodes: Array<{
-    id: string;
-    kind: string;
-    name: string;
-    config?: unknown;
-  }>;
-  edges: Array<
-    | {
-        kind: 'default';
-        from: string;
-        to: string;
-        unidirectional: boolean;
-      }
-    | {
-        kind: 'conditional';
-        from: string;
-        to: string;
-        unidirectional: boolean;
-        expr: string;
-      }
-    | {
-        kind: 'transform';
-        from: string;
-        to: string;
-        unidirectional: boolean;
-        expr: string;
-      }
-  >;
-}
-
-// Basic configuration export structure
-export interface WorkflowExportBasic extends WorkflowExportBase {
-  format: 'motif-ts/basic';
-}
-
-// Full export extends base with runtime state
-export interface WorkflowExportFull extends WorkflowExportBase {
-  format: 'motif-ts/full';
-  state: {
-    current: {
-      nodeId?: string | null;
-      status: TransitionStatus;
-      input?: unknown;
-    };
-    history: Array<{
-      nodeId: string;
-      input?: unknown;
-    }>;
-    stores: Record<string, unknown>;
-  };
-}
-
-export type WorkflowExport = WorkflowExportBasic | WorkflowExportFull;
 
 export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**
@@ -132,11 +73,13 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Export current workflow configuration or full state to JSON structure.
    * @param mode 'basic' for nodes/edges only; 'full' for including runtime state and history.
    */
-  exportWorkflow(mode: 'basic' | 'full'): WorkflowExport;
+  exportWorkflow(mode: 'basic'): z.infer<typeof SchemaBasic>;
+  exportWorkflow(mode: 'full'): z.infer<typeof SchemaFullState>;
   /**
    * Import workflow configuration or full state from JSON. Operation is atomic; on any error, no changes are applied.
    * @param data The JSON object to import.
    * @param mode Must match the export format: 'basic' or 'full'.
    */
-  importWorkflow(data: WorkflowExport, mode: 'basic' | 'full'): void;
+  importWorkflow(mode: 'basic', data: z.infer<typeof SchemaBasic>): void;
+  importWorkflow(mode: 'full', data: z.infer<typeof SchemaFullState>): void;
 }

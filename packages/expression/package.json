@@ -10,7 +10,8 @@
   "scripts": {
     "test": "vitest run --typecheck",
     "format": "prettier \"**/*.{ts,cjs,mjs,json}\" --write",
-    "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix"
+    "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix",
+    "type-check": "tsc --noEmit"
   },
   "keywords": [],
   "author": {

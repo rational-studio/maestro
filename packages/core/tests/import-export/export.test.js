@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import z from 'zod';
+import z from 'zod/v4';
 import { step, workflow, conditionalEdge, transformEdge } from '../../src';
 import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/types';
 

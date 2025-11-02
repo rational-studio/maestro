@@ -1,4 +1,4 @@
-import { type ZodType } from 'zod';
+import { type ZodType } from 'zod/v4';
 import { createStore, type StateCreator, type StoreMutatorIdentifier } from 'zustand/vanilla';
 
 import {

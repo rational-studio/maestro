@@ -19,6 +19,9 @@ export function edge<I, O extends I>(
       // Pass-through without transformation; types are compatible (O extends I)
       return { allow: true, nextInput: outputFrom };
     },
+    serialize() {
+      return { kind: 'default', from: this.from.id, to: this.to.id, unidirectional: this.unidirectional };
+    },
   };
 }
 
@@ -34,11 +37,18 @@ export function conditionalEdge<I, O extends I>(
     from,
     to,
     unidirectional,
-    exprSrc: predicateExprSrc,
-    compiled,
     validateTransition(outputFrom) {
       const ok = !!compiled({ out: outputFrom });
       return ok ? { allow: true as const, nextInput: outputFrom } : { allow: false as const };
+    },
+    serialize() {
+      return {
+        kind: 'conditional',
+        from: this.from.id,
+        to: this.to.id,
+        unidirectional: this.unidirectional,
+        expr: predicateExprSrc,
+      };
     },
   };
 }
@@ -55,8 +65,6 @@ export function transformEdge<I, O>(
     from,
     to,
     unidirectional,
-    exprSrc: transformExprSrc,
-    compiled,
     validateTransition(outputFrom) {
       try {
         const convertedRaw = compiled({ out: outputFrom });
@@ -70,6 +78,15 @@ export function transformEdge<I, O>(
         const msg = e?.message ?? String(e);
         throw new Error(`TransformEdge: failed to convert output -> input. Reason: ${msg}`);
       }
+    },
+    serialize() {
+      return {
+        kind: 'transform',
+        from: this.from.id,
+        to: this.to.id,
+        unidirectional: this.unidirectional,
+        expr: transformExprSrc,
+      };
     },
   };
 }
