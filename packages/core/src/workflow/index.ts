@@ -327,7 +327,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     notify(node.kind, node.name, 'ready');
   };
 
-  const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]): void => {
+  const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]) => {
     const list = Array.isArray(nodesArg) ? nodesArg : [nodesArg];
     const allowed = Array.from(inventoryMap.keys()).join(', ');
     for (const node of list) {
@@ -338,13 +338,14 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       }
       nodes.add(node);
     }
+    return workflowApis;
   };
 
   const connect = <I, O>(
     fromOrEdge: StepInstance<any, O, any, any, any> | EdgeInstance<I, O>,
     to?: StepInstance<I, any, any, any, any>,
     unidirectional = false,
-  ): void => {
+  ) => {
     if (to) {
       const from = fromOrEdge as StepInstance<any, O, any, any, any>;
       if (!nodes.has(from)) {
@@ -373,6 +374,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       }
       edges.push(e);
     }
+    return workflowApis;
   };
 
   const start = <I, O, C, Api extends StepAPI, Store>(node: StepInstance<I, O, C, Api, Store>) => {
@@ -386,6 +388,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       throw new Error(`Cannot start on unregistered StepInstance '${node.id}'. Register the instance before starting.`);
     }
     transitionInto(node, undefined as I, false, []);
+    return workflowApis;
   };
 
   const getCurrentStep = () => currentStep;
@@ -430,7 +433,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     transitionInto,
   });
 
-  return {
+  const workflowApis = {
     register,
     connect,
     start,
@@ -439,5 +442,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     back,
     exportWorkflow,
     importWorkflow,
-  };
+  }
+
+  return workflowApis;
 }

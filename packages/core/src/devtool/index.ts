@@ -1,9 +1,12 @@
-import {} from '@redux-devtools/extension';
-import { type StepCreatorAny } from "../step/types";
-import { type WorkflowAPI } from "../workflow/types";
+import '@redux-devtools/extension';
 
-export default function devtoolsMiddleware<const Creators extends readonly StepCreatorAny[]>(workflow: WorkflowAPI<Creators>): WorkflowAPI<Creators> {
-  const {__REDUX_DEVTOOLS_EXTENSION__} = window;
+import { type StepCreatorAny } from '../step/types';
+import { type WorkflowAPI } from '../workflow/types';
+
+export default function devtoolsMiddleware<const Creators extends readonly StepCreatorAny[]>(
+  workflow: WorkflowAPI<Creators>,
+): WorkflowAPI<Creators> {
+  const { __REDUX_DEVTOOLS_EXTENSION__ } = window;
   if (!__REDUX_DEVTOOLS_EXTENSION__) {
     return workflow;
   }
