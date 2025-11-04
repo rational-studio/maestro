@@ -25,14 +25,14 @@
     "@motif-ts/core": "workspace:*",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@types/react": "^19.2.2",
-    "@vitest/coverage-v8": "4.0.6",
+    "@vitest/coverage-v8": "4.0.7",
     "eslint": "^9.39.1",
     "@eslint/js": "^9.39.1",
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.3",
-    "vitest": "^4.0.6"
+    "vitest": "^4.0.7"
   },
   "peerDependencies": {
     "@motif-ts/core": "workspace:*",

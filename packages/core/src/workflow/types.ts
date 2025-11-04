@@ -55,7 +55,9 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**
    * Start the workflow.
    */
-  start<Input, Output, Config, Api extends StepAPI, Store>(node: StepInstance<Input, Output, Config, Api, Store>): WorkflowAPI<Creators>;
+  start<Input, Output, Config, Api extends StepAPI, Store>(
+    node: StepInstance<Input, Output, Config, Api, Store>,
+  ): WorkflowAPI<Creators>;
   /**
    * Get the current step.
    */
