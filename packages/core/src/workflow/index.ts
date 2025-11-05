@@ -1,5 +1,5 @@
-import { conditionalEdge, edge, transformEdge } from '../edge';
-import { type DeserializableEdgeFunc, type Edge } from '../edge/type';
+import { edge } from '../edge';
+import { type Edge } from '../edge/type';
 import { CLEANUP_ARRAY_EXECUTED } from '../step/constants';
 import {
   type BuildArgs,
@@ -13,18 +13,10 @@ import {
 } from '../step/types';
 import { type WorkflowContext } from './context';
 import { computeNextEffects, initialEffects, type EffectDef } from './effects';
-import { createImportExportHandlers } from './io';
 import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
-import { validateInventory } from './validators';
 
-export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
-  const edgeInventoryMap = new Map<string, DeserializableEdgeFunc>([
-    ['default', edge],
-    ['conditional', conditionalEdge],
-    ['transform', transformEdge],
-  ]);
-  const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
+export function workflow<const Creators extends readonly StepCreatorAny[]>(): WorkflowAPI<Creators> {
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
   const edges: Edge<any, any>[] = [];
   const history: Array<{
@@ -41,15 +33,6 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   let currentApi: StepAPI | undefined;
   let context: WorkflowContext | undefined;
   let contextVersionCounter = 0;
-
-  // Validate duplicate kinds with detailed error information
-  validateInventory(inventory);
-
-  for (const creator of inventory) {
-    stepInventoryMap.set(creator.kind, creator);
-  }
-
-  Object.freeze(inventory);
 
   const subscribe = (handler: (kind: string, name: string, status: TransitionStatus) => void) => {
     subscribers.add(handler);
@@ -334,13 +317,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]) => {
     const list = Array.isArray(nodesArg) ? nodesArg : [nodesArg];
-    const allowed = Array.from(stepInventoryMap.keys()).join(', ');
     for (const node of list) {
-      if (!stepInventoryMap.has(node.kind)) {
-        throw new Error(
-          `Cannot register StepInstance kind '${node.kind}'. Not listed in inventory. Allowed kinds: [${allowed}]`,
-        );
-      }
       nodes.add(node);
     }
     return workflowApis;
@@ -383,12 +360,6 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const start = <I, O, C, Api extends StepAPI, Store>(node: StepInstance<I, O, C, Api, Store>) => {
-    if (!stepInventoryMap.has(node.kind)) {
-      const allowed = Array.from(stepInventoryMap.keys()).join(', ');
-      throw new Error(
-        `Cannot start on StepInstance kind '${node.kind}'. Not listed in inventory. Allowed kinds: [${allowed}]`,
-      );
-    }
     if (!nodes.has(node)) {
       throw new Error(`Cannot start on unregistered StepInstance '${node.id}'. Register the instance before starting.`);
     }
@@ -424,21 +395,6 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     transitionInto(prev.node, prev.input, true, prev.outCleanupOnBack);
   };
 
-  // wire import/export handlers from separate module
-  const { exportWorkflow, importWorkflow } = createImportExportHandlers({
-    stepInventoryMap,
-    edgeInventoryMap,
-    nodes,
-    edges,
-    history,
-    getCurrentStep,
-    getCurrentNode,
-    getContext,
-    setNotStarted,
-    runExitSequence,
-    transitionInto,
-  });
-
   const workflowApis = {
     register,
     connect,
@@ -446,8 +402,17 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     getCurrentStep,
     subscribe,
     back,
-    exportWorkflow,
-    importWorkflow,
+    // For Internal Use
+    INTERNAL: {
+      nodes,
+      edges,
+      history,
+      getCurrentNode,
+      getContext,
+      setNotStarted,
+      runExitSequence,
+      transitionInto,
+    },
   };
 
   return workflowApis;

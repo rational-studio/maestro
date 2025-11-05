@@ -1,13 +1,14 @@
+import { step, workflow } from '@motif-ts/core';
 import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 
-import { step, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/constants';
+import persist from '../../src/persist';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/persist/constants';
 
 describe('Performance - large workflow export/import', () => {
   it('handles large number of nodes and edges efficiently', () => {
     const Node = step({ kind: 'N', outputSchema: z.number() }, ({ next }) => ({ go: (x: number) => next(x) }));
-    const wf = workflow([Node]);
+    const wf = persist(workflow(), [Node]);
 
     const nodes = [];
     for (let i = 0; i < 1000; i++) {

@@ -200,3 +200,14 @@ Build args include:
 
 - Hooks may be `async`, but cleanup functions must be returned synchronously
 - Works in Node and browsers; React integration is optional
+
+## DevTools Middleware
+
+Development tooling such as the Redux DevTools integration has moved to `@motif-ts/middleware`.
+
+```ts
+import { devtools } from '@motif-ts/middleware';
+import { workflow } from '@motif-ts/core';
+// Wrap your orchestrator to enable DevTools when available
+const orchestratorWithDevtools = devtools(workflow([/* ... */]));
+```

@@ -1,15 +1,16 @@
+import { conditionalEdge, step, transformEdge, workflow } from '@motif-ts/core';
 import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 
-import { conditionalEdge, step, transformEdge, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/constants';
+import persist from '../../src/persist';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/persist/constants';
 
 describe('Export workflow - basic and full', () => {
   it('exports basic configuration with nodes and edges', () => {
     const A = step({ kind: 'A', outputSchema: z.number() }, ({ next }) => ({ go: () => next(1) }));
     const B = step({ kind: 'B', inputSchema: z.number() }, () => ({ done: true }));
 
-    const wf = workflow([A, B]);
+    const wf = persist(workflow(), [A, B]);
     const a = A('a');
     const b = B('b');
     wf.register([a, b]);
@@ -30,7 +31,7 @@ describe('Export workflow - basic and full', () => {
     );
     const Sink = step({ kind: 'T', inputSchema: z.number() }, ({ input }) => ({ value: input }));
 
-    const wf = workflow([StoreStep, Sink]);
+    const wf = persist(workflow(), [StoreStep, Sink]);
     const s = StoreStep('s', { v: 42 });
     const t = Sink('t');
     wf.register([s, t]);
@@ -56,7 +57,7 @@ describe('Export workflow - basic and full', () => {
       who: () => input.username + ':' + input.years,
     }));
 
-    const wf = workflow([Emitter, Even, Odd, A, B]);
+    const wf = persist(workflow(), [Emitter, Even, Odd, A, B]);
     const emitter = Emitter('emitter');
     const even = Even('even');
     const odd = Odd('odd');
@@ -82,7 +83,7 @@ describe('Export workflow - basic and full', () => {
   });
   it('exports when not started (no current node)', () => {
     const A = step({ kind: 'A' }, () => ({ noop: true }));
-    const wf = workflow([A]);
+    const wf = persist(workflow(), [A]);
     const a = A('a');
     wf.register(a);
 

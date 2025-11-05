@@ -1,15 +1,16 @@
+import { step, workflow } from '@motif-ts/core';
 import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 
-import { step, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION, type SchemaBasic, type SchemaFullState } from '../../src/workflow/constants';
+import persist from '../../src/persist';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION, type SchemaBasic, type SchemaFullState } from '../../src/persist/constants';
 
 describe('Import workflow - basic and full', () => {
   it('imports basic configuration and replaces nodes/edges atomically', () => {
     const A = step({ kind: 'A', outputSchema: z.number() }, ({ next }) => ({ go: () => next(1) }));
     const B = step({ kind: 'B', inputSchema: z.number() }, () => ({ done: true }));
 
-    const wf = workflow([A, B]);
+    const wf = persist(workflow(), [A, B]);
 
     const importPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
@@ -32,7 +33,7 @@ describe('Import workflow - basic and full', () => {
       run: () => next(1),
     }));
     const T = step({ kind: 'T', inputSchema: z.number() }, ({ input }) => ({ val: input }));
-    const wf = workflow([S, T]);
+    const wf = persist(workflow(), [S, T]);
 
     const importPayload: z.infer<typeof SchemaFullState> = {
       format: 'motif-ts/full',
@@ -56,7 +57,7 @@ describe('Import workflow - basic and full', () => {
 
   it('rejects invalid schema version', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
-    const wf = workflow([A]);
+    const wf = persist(workflow(), [A]);
     const badPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
       // @ts-expect-error
@@ -69,7 +70,7 @@ describe('Import workflow - basic and full', () => {
 
   it('rejects when edge references unknown node', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
-    const wf = workflow([A]);
+    const wf = persist(workflow(), [A]);
     const badPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,

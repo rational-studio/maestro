@@ -2,7 +2,8 @@
  * Inventory validation utilities.
  * Ensures each Step kind in the workflow inventory is unique.
  */
-import { type StepCreatorAny } from '../step/types';
+
+import { type StepCreatorAny } from '@motif-ts/core';
 
 export function validateInventory(inventory: readonly StepCreatorAny[]) {
   const counts: Record<string, number> = {};

@@ -1,8 +1,12 @@
-import type z from 'zod/v4';
-
 import { type Edge } from '../edge/type';
-import { type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
-import { type SchemaBasic, type SchemaFullState } from './constants';
+import {
+  type CleanupFn,
+  type CleanupFnArray,
+  type StepAPI,
+  type StepCreatorAny,
+  type StepInstance,
+} from '../step/types';
+import { type WorkflowContext } from './context';
 
 export type TransitionStatus = 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut';
 
@@ -71,17 +75,23 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Back to the previous step.
    */
   back(): void;
-  /**
-   * Export current workflow configuration or full state to JSON structure.
-   * @param mode 'basic' for nodes/edges only; 'full' for including runtime state and history.
-   */
-  exportWorkflow(mode: 'basic'): z.infer<typeof SchemaBasic>;
-  exportWorkflow(mode: 'full'): z.infer<typeof SchemaFullState>;
-  /**
-   * Import workflow configuration or full state from JSON. Operation is atomic; on any error, no changes are applied.
-   * @param data The JSON object to import.
-   * @param mode Must match the export format: 'basic' or 'full'.
-   */
-  importWorkflow(mode: 'basic', data: z.infer<typeof SchemaBasic>): void;
-  importWorkflow(mode: 'full', data: z.infer<typeof SchemaFullState>): void;
+  INTERNAL: {
+    nodes: Set<StepInstance<any, any, any, any, any>>;
+    edges: Edge<any, any>[];
+    history: {
+      node: StepInstance<any, any, any, any, any>;
+      input: unknown;
+      outCleanupOnBack: CleanupFn[];
+    }[];
+    getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
+    getContext: () => WorkflowContext | undefined;
+    setNotStarted: () => void;
+    runExitSequence: () => CleanupFnArray;
+    transitionInto: (
+      node: StepInstance<any, any, any, any, any>,
+      input: any,
+      isBack: boolean,
+      backCleanups: CleanupFn[],
+    ) => void;
+  };
 }

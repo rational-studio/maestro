@@ -2,7 +2,8 @@
   "name": "motif-ts-monorepo",
   "private": true,
   "scripts": {
-    "motif": "pnpm --filter motif-ts"
+    "motif": "pnpm --filter motif-ts",
+    "test:all": "pnpm -w -r test"
   },
   "devDependencies": {
     "pnpm": "^10.20.0"

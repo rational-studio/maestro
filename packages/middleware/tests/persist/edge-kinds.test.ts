@@ -1,8 +1,9 @@
+import { conditionalEdge, step, transformEdge, workflow } from '@motif-ts/core';
 import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 
-import { conditionalEdge, step, transformEdge, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/constants';
+import persist from '../../src/persist';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/persist/constants';
 
 describe('Import/Export with edge kinds and expressions', () => {
   it('exports edges with kind and expr fields', () => {
@@ -18,7 +19,7 @@ describe('Import/Export with edge kinds and expressions', () => {
       who: () => input.username + ':' + input.years,
     }));
 
-    const wf = workflow([Emitter, Even, Odd, A, B]);
+    const wf = persist(workflow(), [Emitter, Even, Odd, A, B]);
     const emitter = Emitter('emitter');
     const even = Even('even');
     const odd = Odd('odd');
@@ -55,7 +56,7 @@ describe('Import/Export with edge kinds and expressions', () => {
       id: () => input,
     }));
 
-    const wf = workflow([Emitter, Even, Odd]);
+    const wf = persist(workflow(), [Emitter, Even, Odd]);
     const payload = {
       format: 'motif-ts/basic' as const,
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
