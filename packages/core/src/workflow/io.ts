@@ -1,7 +1,8 @@
 import type z from 'zod/v4';
 
-import { type DeserializableEdgeFactory, type SerializableEdge } from '../edge/type';
-import { type CleanupFn, type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
+import { type Edge, type DeserializableEdgeFactory, type SerializableEdge } from '../edge/type';
+import { type StepCreatorAny, } from '../step/types';
+import { type CleanupFn, type StepAPI, type StepInstance } from '../step/types';
 import { SchemaBasic, SchemaFullState, WORKFLOW_EXPORT_SCHEMA_VERSION } from './constants';
 
 type WorkflowExport = z.infer<typeof SchemaBasic | typeof SchemaFullState>;
@@ -12,7 +13,7 @@ type HandlersDeps = {
   stepInventoryMap: Map<string, StepCreatorAny>;
   edgeInventoryMap: Map<string, DeserializableEdgeFactory>;
   nodes: Set<StepInstance<any, any, any, any, any>>;
-  edges: SerializableEdge<any, any>[];
+  edges: Edge<any, any>[];
   history: Array<{ node: StepInstance<any, any, any, any, any>; input: unknown; outCleanupOnBack: CleanupFn[] }>;
   getCurrentStep: () => { status: 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut' } | any;
   getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
@@ -53,6 +54,8 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         from: e.from.id,
         to: e.to.id,
         unidirectional: e.unidirectional,
+        // FIXME: check
+        // @ts-expect-error
         config: e.serialize(),
       })),
     };

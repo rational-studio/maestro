@@ -1,6 +1,6 @@
 export { step } from './step';
 export { workflow } from './workflow';
 export { edge, conditionalEdge, transformEdge } from './edge';
-export { type Edge as Edge } from './edge/type';
+export { type Edge } from './edge/type';
 export { type StepCreatorAny } from './step/types';
 export { type CurrentStep, type WorkflowAPI } from './workflow/types';

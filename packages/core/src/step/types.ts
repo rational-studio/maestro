@@ -3,6 +3,9 @@ import { type StateCreator, type StoreApi, type StoreMutatorIdentifier } from 'z
 
 import { type CLEANUP_ARRAY_EXECUTED } from './constants';
 
+export type UNKNOWN = unknown;
+export type EMPTY = void;
+
 export type CleanupFn = void | (() => void);
 
 export type CleanupFnArray = CleanupFn[] & { [CLEANUP_ARRAY_EXECUTED]?: boolean };
@@ -20,8 +23,8 @@ export type BuildArgs<Input, Output, Config, Store> = {
   effect: (fn: () => CleanupFn, deps?: DependencyList) => void;
   input: Input;
   next: (output: Output) => void;
-} & ([Store] extends [undefined] ? {} : { store: Store }) &
-  ([Config] extends [undefined] ? {} : { config: Config });
+} & ([Store] extends [EMPTY] ? {} : { store: Store }) &
+  ([Config] extends [EMPTY] ? {} : { config: Config });
 
 export type StepDef<
   Kind extends string,

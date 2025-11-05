@@ -1,6 +1,6 @@
 import type z from 'zod/v4';
 
-import { type SerializableEdge } from '../edge/type';
+import { type Edge } from '../edge/type';
 import { type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
 import { type SchemaBasic, type SchemaFullState } from './constants';
 
@@ -35,7 +35,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Register steps to the workflow.
    * @param nodesArg The steps to register.
    */
-  register(nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]): void;
+  register(nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]): WorkflowAPI<Creators>;
   /**
    * Connect two steps together.
    * @param from The step to transition out from.
@@ -46,16 +46,18 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
     from: StepInstance<any, Output, any, any, any>,
     to: StepInstance<Input, any, any, any, any>,
     unidirectional?: boolean,
-  ): void;
+  ): WorkflowAPI<Creators>;
   /**
    * Connect two steps together using an edge.
    * @param edge The edge to connect.
    */
-  connect<Input, Output>(edge: SerializableEdge<Input, Output>): void;
+  connect<Input, Output>(edge: Edge<Input, Output>): WorkflowAPI<Creators>;
   /**
    * Start the workflow.
    */
-  start<Input, Output, Config, Api extends StepAPI, Store>(node: StepInstance<Input, Output, Config, Api, Store>): void;
+  start<Input, Output, Config, Api extends StepAPI, Store>(
+    node: StepInstance<Input, Output, Config, Api, Store>,
+  ): WorkflowAPI<Creators>;
   /**
    * Get the current step.
    */

@@ -3,11 +3,13 @@ import { createStore, type StateCreator, type StoreMutatorIdentifier } from 'zus
 
 import {
   type BuildArgs,
+  type EMPTY,
   type StepAPI,
   type StepCreatorConfig,
   type StepCreatorNoConfig,
   type StepDef,
   type StepInstance,
+  type UNKNOWN,
 } from './types';
 
 // 1) configSchema present, createStore present
@@ -35,7 +37,6 @@ export function step<
 export function step<
   Kind extends string,
   Input,
-  Output,
   Config,
   Api extends StepAPI,
   Store,
@@ -47,13 +48,12 @@ export function step<
     configSchema: ZodType<Config>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, Config, Store>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, Store>;
+  build: (args: BuildArgs<Input, EMPTY, Config, Store>) => Api,
+): StepCreatorConfig<Kind, Input, EMPTY, Config, Api, Store>;
 
 // 1.3) inputSchema absent, outputSchema present
 export function step<
   Kind extends string,
-  Input,
   Output,
   Config,
   Api extends StepAPI,
@@ -66,14 +66,12 @@ export function step<
     configSchema: ZodType<Config>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, Config, Store>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, Store>;
+  build: (args: BuildArgs<UNKNOWN, Output, Config, Store>) => Api,
+): StepCreatorConfig<Kind, UNKNOWN, Output, Config, Api, Store>;
 
 // 1.4) inputSchema absent, outputSchema absent
 export function step<
   Kind extends string,
-  Input,
-  Output,
   Config,
   Api extends StepAPI,
   Store,
@@ -84,33 +82,33 @@ export function step<
     configSchema: ZodType<Config>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, Config, Store>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, Store>;
+  build: (args: BuildArgs<UNKNOWN, EMPTY, Config, Store>) => Api,
+): StepCreatorConfig<Kind, UNKNOWN, EMPTY, Config, Api, Store>;
 
 // 2) configSchema present, createStore absent
 // 2.1) inputSchema present, outputSchema present
 export function step<Kind extends string, Input, Output, Config, Api extends StepAPI>(
   def: { kind: Kind; inputSchema: ZodType<Input>; outputSchema: ZodType<Output>; configSchema: ZodType<Config> },
-  build: (args: BuildArgs<Input, Output, Config, undefined>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, undefined>;
+  build: (args: BuildArgs<Input, Output, Config, EMPTY>) => Api,
+): StepCreatorConfig<Kind, Input, Output, Config, Api, EMPTY>;
 
 // 2.2) inputSchema present, outputSchema absent
-export function step<Kind extends string, Input, Output, Config, Api extends StepAPI>(
+export function step<Kind extends string, Input, Config, Api extends StepAPI>(
   def: { kind: Kind; inputSchema: ZodType<Input>; configSchema: ZodType<Config> },
-  build: (args: BuildArgs<Input, Output, Config, undefined>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, undefined>;
+  build: (args: BuildArgs<Input, EMPTY, Config, EMPTY>) => Api,
+): StepCreatorConfig<Kind, Input, EMPTY, Config, Api, EMPTY>;
 
 // 2.3) inputSchema absent, outputSchema present
-export function step<Kind extends string, Input, Output, Config, Api extends StepAPI>(
+export function step<Kind extends string, Output, Config, Api extends StepAPI>(
   def: { kind: Kind; outputSchema: ZodType<Output>; configSchema: ZodType<Config> },
-  build: (args: BuildArgs<Input, Output, Config, undefined>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, undefined>;
+  build: (args: BuildArgs<UNKNOWN, Output, Config, EMPTY>) => Api,
+): StepCreatorConfig<Kind, UNKNOWN, Output, Config, Api, EMPTY>;
 
 // 2.4) inputSchema absent, outputSchema absent
-export function step<Kind extends string, Input, Output, Config, Api extends StepAPI>(
+export function step<Kind extends string, Config, Api extends StepAPI>(
   def: { kind: Kind; configSchema: ZodType<Config> },
-  build: (args: BuildArgs<Input, Output, Config, undefined>) => Api,
-): StepCreatorConfig<Kind, Input, Output, Config, Api, undefined>;
+  build: (args: BuildArgs<UNKNOWN, EMPTY, Config, EMPTY>) => Api,
+): StepCreatorConfig<Kind, UNKNOWN, EMPTY, Config, Api, EMPTY>;
 
 // 3) configSchema absent, createStore present
 // 3.1) inputSchema present, outputSchema present
@@ -128,14 +126,13 @@ export function step<
     outputSchema: ZodType<Output>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, undefined, Store>) => Api,
+  build: (args: BuildArgs<Input, Output, EMPTY, Store>) => Api,
 ): StepCreatorNoConfig<Kind, Input, Output, Api, Store>;
 
 // 3.2) inputSchema present, outputSchema absent
 export function step<
   Kind extends string,
   Input,
-  Output,
   Api extends StepAPI,
   Store,
   Mos extends [StoreMutatorIdentifier, unknown][] = [],
@@ -145,13 +142,12 @@ export function step<
     inputSchema: ZodType<Input>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, undefined, Store>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, Store>;
+  build: (args: BuildArgs<Input, EMPTY, EMPTY, Store>) => Api,
+): StepCreatorNoConfig<Kind, Input, EMPTY, Api, Store>;
 
 // 3.3) inputSchema absent, outputSchema present
 export function step<
   Kind extends string,
-  Input,
   Output,
   Api extends StepAPI,
   Store,
@@ -162,14 +158,12 @@ export function step<
     outputSchema: ZodType<Output>;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, undefined, Store>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, Store>;
+  build: (args: BuildArgs<UNKNOWN, Output, EMPTY, Store>) => Api,
+): StepCreatorNoConfig<Kind, UNKNOWN, Output, Api, Store>;
 
 // 3.4) inputSchema absent, outputSchema absent
 export function step<
   Kind extends string,
-  Input,
-  Output,
   Api extends StepAPI,
   Store,
   Mos extends [StoreMutatorIdentifier, unknown][] = [],
@@ -178,33 +172,33 @@ export function step<
     kind: Kind;
     createStore: StateCreator<Store, [], Mos>;
   },
-  build: (args: BuildArgs<Input, Output, undefined, Store>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, Store>;
+  build: (args: BuildArgs<UNKNOWN, EMPTY, EMPTY, Store>) => Api,
+): StepCreatorNoConfig<Kind, UNKNOWN, EMPTY, Api, Store>;
 
 // 4) configSchema absent, createStore absent
 // 4.1) inputSchema present, outputSchema present
 export function step<Kind extends string, Input, Output, Api extends StepAPI>(
   def: { kind: Kind; inputSchema: ZodType<Input>; outputSchema: ZodType<Output> },
-  build: (args: BuildArgs<Input, Output, undefined, undefined>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, undefined>;
+  build: (args: BuildArgs<Input, Output, EMPTY, EMPTY>) => Api,
+): StepCreatorNoConfig<Kind, Input, Output, Api, EMPTY>;
 
 // 4.2) inputSchema present, outputSchema absent
-export function step<Kind extends string, Input, Output, Api extends StepAPI>(
+export function step<Kind extends string, Input, Api extends StepAPI>(
   def: { kind: Kind; inputSchema: ZodType<Input> },
-  build: (args: BuildArgs<Input, Output, undefined, undefined>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, undefined>;
+  build: (args: BuildArgs<Input, EMPTY, EMPTY, EMPTY>) => Api,
+): StepCreatorNoConfig<Kind, Input, EMPTY, Api, EMPTY>;
 
 // 4.3) inputSchema absent, outputSchema present
-export function step<Kind extends string, Input, Output, Api extends StepAPI>(
+export function step<Kind extends string, Output, Api extends StepAPI>(
   def: { kind: Kind; outputSchema: ZodType<Output> },
-  build: (args: BuildArgs<Input, Output, undefined, undefined>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, undefined>;
+  build: (args: BuildArgs<UNKNOWN, Output, EMPTY, EMPTY>) => Api,
+): StepCreatorNoConfig<Kind, UNKNOWN, Output, Api, EMPTY>;
 
 // 4.4) inputSchema absent, outputSchema absent
-export function step<Kind extends string, Input, Output, Api extends StepAPI>(
+export function step<Kind extends string, Api extends StepAPI>(
   def: { kind: Kind },
-  build: (args: BuildArgs<Input, Output, undefined, undefined>) => Api,
-): StepCreatorNoConfig<Kind, Input, Output, Api, undefined>;
+  build: (args: BuildArgs<EMPTY, EMPTY, EMPTY, EMPTY>) => Api,
+): StepCreatorNoConfig<Kind, UNKNOWN, EMPTY, Api, EMPTY>;
 
 // runtime implementation
 export function step<
