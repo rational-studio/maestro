@@ -51,7 +51,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Connect two steps together using an edge.
    * @param edge The edge to connect.
    */
-  connect<Input, Output>(edge: Edge<Input, Output>): WorkflowAPI<Creators>;
+  connect(edge: Edge<any, any>): WorkflowAPI<Creators>;
   /**
    * Start the workflow.
    */

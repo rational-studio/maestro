@@ -18,39 +18,11 @@ export interface SerializableEdge<I, O> extends Edge<I, O> {
   serialize(): unknown;
 }
 
-export interface DeserializableEdgeFactory {
+export interface DeserializableEdgeFunc {
   deserialize(
     from: StepInstance<any, any, any, any, any>,
     to: StepInstance<any, any, any, any, any>,
     unidirectional: boolean,
     serialized: unknown,
   ): SerializableEdge<any, any>;
-}
-
-export interface EdgeFactory<Args extends unknown[]> {
-  <I, O extends I>(
-    from: StepInstance<any, O, any, any, any>,
-    to: StepInstance<I, any, any, any, any>,
-    ...args: Args
-  ): Edge<I, O>;
-}
-
-export interface EdgeFactoryConstraintFree<Args extends unknown[]> {
-  <I, O>(from: StepInstance<any, O, any, any, any>, to: StepInstance<I, any, any, any, any>, ...args: Args): Edge<I, O>;
-}
-
-export interface EdgeFactorySerializable<Args extends unknown[]> extends DeserializableEdgeFactory {
-  <I, O extends I>(
-    from: StepInstance<any, O, any, any, any>,
-    to: StepInstance<I, any, any, any, any>,
-    ...args: Args
-  ): SerializableEdge<I, O>;
-}
-
-export interface EdgeFactorySerializableConstraintFree<Args extends unknown[]> extends DeserializableEdgeFactory {
-  <I, O>(
-    from: StepInstance<any, O, any, any, any>,
-    to: StepInstance<I, any, any, any, any>,
-    ...args: Args
-  ): SerializableEdge<I, O>;
 }

@@ -1,8 +1,7 @@
 import type z from 'zod/v4';
 
-import { type Edge, type DeserializableEdgeFactory, type SerializableEdge } from '../edge/type';
-import { type StepCreatorAny, } from '../step/types';
-import { type CleanupFn, type StepAPI, type StepInstance } from '../step/types';
+import { type DeserializableEdgeFunc, type Edge, type SerializableEdge } from '../edge/type';
+import { type CleanupFn, type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
 import { SchemaBasic, SchemaFullState, WORKFLOW_EXPORT_SCHEMA_VERSION } from './constants';
 
 type WorkflowExport = z.infer<typeof SchemaBasic | typeof SchemaFullState>;
@@ -11,7 +10,7 @@ type WorkflowExportFull = z.infer<typeof SchemaFullState>;
 
 type HandlersDeps = {
   stepInventoryMap: Map<string, StepCreatorAny>;
-  edgeInventoryMap: Map<string, DeserializableEdgeFactory>;
+  edgeInventoryMap: Map<string, DeserializableEdgeFunc>;
   nodes: Set<StepInstance<any, any, any, any, any>>;
   edges: Edge<any, any>[];
   history: Array<{ node: StepInstance<any, any, any, any, any>; input: unknown; outCleanupOnBack: CleanupFn[] }>;
@@ -27,6 +26,10 @@ type HandlersDeps = {
     backCleanups: CleanupFn[],
   ) => void;
 };
+
+function isEdgeSerializable<I, O>(edge: Edge<I, O>): edge is SerializableEdge<I, O> {
+  return Boolean(edge.serializable) && typeof (edge as any).serialize !== 'function';
+}
 
 export function createImportExportHandlers(deps: HandlersDeps) {
   const {
@@ -49,15 +52,19 @@ export function createImportExportHandlers(deps: HandlersDeps) {
     const base: Omit<WorkflowExportBasic, 'format'> = {
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
       nodes: Array.from(nodes).map((n) => ({ id: n.id, kind: n.kind, name: n.name, config: n.config })),
-      edges: edges.map((e) => ({
-        kind: e.kind,
-        from: e.from.id,
-        to: e.to.id,
-        unidirectional: e.unidirectional,
-        // FIXME: check
-        // @ts-expect-error
-        config: e.serialize(),
-      })),
+      edges: edges.map((e) => {
+        if (isEdgeSerializable(e)) {
+          return {
+            kind: e.kind,
+            from: e.from.id,
+            to: e.to.id,
+            unidirectional: e.unidirectional,
+            config: e.serialize(),
+          };
+        } else {
+          throw new Error(`Edge ${e.kind} is not serializable`);
+        }
+      }),
     };
     if (mode === 'basic') {
       const payload: WorkflowExportBasic = { format: 'motif-ts/basic', ...base };

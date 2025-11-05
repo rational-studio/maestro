@@ -1,5 +1,5 @@
-import {edge, conditionalEdge,  transformEdge } from '../edge';
-import { type Edge, type DeserializableEdgeFactory } from '../edge/type';
+import { conditionalEdge, edge, transformEdge } from '../edge';
+import { type DeserializableEdgeFunc, type Edge } from '../edge/type';
 import { CLEANUP_ARRAY_EXECUTED } from '../step/constants';
 import {
   type BuildArgs,
@@ -19,7 +19,7 @@ import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } f
 import { validateInventory } from './validators';
 
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
-  const edgeInventoryMap = new Map<string, DeserializableEdgeFactory>([
+  const edgeInventoryMap = new Map<string, DeserializableEdgeFunc>([
     ['default', edge],
     ['conditional', conditionalEdge],
     ['transform', transformEdge],
@@ -346,13 +346,13 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     return workflowApis;
   };
 
-  const connect = <I, O>(
-    fromOrEdge: StepInstance<any, O, any, any, any> | Edge<I, O>,
-    to?: StepInstance<I, any, any, any, any>,
+  const connect = <SI, SO extends SI, EI, EO>(
+    fromOrEdge: StepInstance<any, SO, any, any, any> | Edge<EI, EO>,
+    to?: StepInstance<SI, any, any, any, any>,
     unidirectional = false,
   ) => {
     if (to) {
-      const from = fromOrEdge as StepInstance<any, O, any, any, any>;
+      const from = fromOrEdge as StepInstance<any, SO, any, any, any>;
       if (!nodes.has(from)) {
         throw new Error(
           `Cannot connect from unregistered StepInstance '${from.id}'. Register the instance before connecting.`,
@@ -366,7 +366,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       const e = edge(from, to, unidirectional);
       edges.push(e);
     } else {
-      const e = fromOrEdge as Edge<I, O>;
+      const e = fromOrEdge as Edge<EI, EO>;
       if (!nodes.has(e.from)) {
         throw new Error(
           `Cannot connect from unregistered StepInstance '${e.from.id}'. Register the instance before connecting.`,
