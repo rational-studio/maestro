@@ -1,71 +1,82 @@
 import expression from '@motif-ts/expression';
 
 import { type StepInstance } from '../step/types';
-import { type Edge } from './type';
+import { type EdgeFactorySerializableConstraintFree, type EdgeFactorySerializable } from './type';
 
-// BidirectionalEdge: default connector allowing forward and backward transitions
-// Use when connectingA, B) without specifying edge type.
-export function edge<I, O extends I>(
+export const edge: EdgeFactorySerializable<[unidirectional?: boolean]> = <I, O extends I>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
   unidirectional = false,
-): Edge<I, O> {
+) => {
   return {
     kind: 'default',
     from,
     to,
     unidirectional,
+    serializable: true,
     validateTransition(outputFrom) {
       // Pass-through without transformation; types are compatible (O extends I)
       return { allow: true, nextInput: outputFrom };
     },
     serialize() {
-      return { kind: 'default', from: this.from.id, to: this.to.id, unidirectional: this.unidirectional };
+      return null;
     },
   };
-}
+};
 
-export function conditionalEdge<I, O extends I>(
+edge.deserialize = (from, to, unidirectional) => {
+  return edge(from, to, unidirectional);
+};
+
+export const conditionalEdge: EdgeFactorySerializable<[predicateExprSrc: string, unidirectional?: boolean]> = <
+  I,
+  O extends I,
+>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
   predicateExprSrc: string,
   unidirectional = false,
-): Edge<I, O> {
+) => {
   const compiled = expression(predicateExprSrc);
   return {
     kind: 'conditional',
     from,
     to,
     unidirectional,
-    validateTransition(outputFrom) {
+    serializable: true,
+    validateTransition(outputFrom: O) {
       const ok = !!compiled({ out: outputFrom });
-      return ok ? { allow: true as const, nextInput: outputFrom } : { allow: false as const };
+      return ok ? { allow: true, nextInput: outputFrom } : { allow: false };
     },
     serialize() {
-      return {
-        kind: 'conditional',
-        from: this.from.id,
-        to: this.to.id,
-        unidirectional: this.unidirectional,
-        expr: predicateExprSrc,
-      };
+      return predicateExprSrc;
     },
   };
-}
+};
 
-export function transformEdge<I, O>(
+conditionalEdge.deserialize = (from, to, unidirectional, expr) => {
+  if (typeof expr !== 'string') {
+    throw new Error('ConditionalEdge: serialized must be a string');
+  }
+  return conditionalEdge(from, to, expr, unidirectional);
+};
+
+export const transformEdge: EdgeFactorySerializableConstraintFree<
+  [transformExprSrc: string, unidirectional?: boolean]
+> = <I, O>(
   from: StepInstance<any, O, any, any, any>,
   to: StepInstance<I, any, any, any, any>,
   transformExprSrc: string,
   unidirectional = false,
-): Edge<I, O> {
+) => {
   const compiled = expression(transformExprSrc);
   return {
     kind: 'transform',
     from,
     to,
     unidirectional,
-    validateTransition(outputFrom) {
+    serializable: true,
+    validateTransition(outputFrom: O) {
       try {
         const convertedRaw = compiled({ out: outputFrom });
         if (convertedRaw === undefined) {
@@ -80,13 +91,14 @@ export function transformEdge<I, O>(
       }
     },
     serialize() {
-      return {
-        kind: 'transform',
-        from: this.from.id,
-        to: this.to.id,
-        unidirectional: this.unidirectional,
-        expr: transformExprSrc,
-      };
+      return transformExprSrc;
     },
   };
-}
+};
+
+transformEdge.deserialize = (from, to, unidirectional, transformExprSrc) => {
+  if (typeof transformExprSrc !== 'string') {
+    throw new Error('TransformEdge: serialized must be a string');
+  }
+  return transformEdge(from, to, transformExprSrc, unidirectional);
+};

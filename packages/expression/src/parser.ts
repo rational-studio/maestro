@@ -24,8 +24,7 @@ const expectPunct = (ps: ParserState, value: string) => {
   next(ps);
 };
 
-// 类型守卫：显式确保节点存在，避免使用非空断言
-const mustNode = (ps: ParserState, node: ASTNode | null): ASTNode => {
+const mustNode = (ps: ParserState, node: ASTNode | null) => {
   if (!node) {
     raiseParseError(ps.src);
   }

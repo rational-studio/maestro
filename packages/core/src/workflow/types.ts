@@ -1,6 +1,6 @@
 import type z from 'zod/v4';
 
-import { type Edge } from '../edge/type';
+import { type SerializableEdge } from '../edge/type';
 import { type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
 import { type SchemaBasic, type SchemaFullState } from './constants';
 
@@ -51,7 +51,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Connect two steps together using an edge.
    * @param edge The edge to connect.
    */
-  connect<Input, Output>(edge: Edge<Input, Output>): void;
+  connect<Input, Output>(edge: SerializableEdge<Input, Output>): void;
   /**
    * Start the workflow.
    */

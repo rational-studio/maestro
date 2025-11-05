@@ -1,21 +1,33 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
+
 import { step, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/types';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION, type SchemaBasic } from '../../src/workflow/constants';
 
 describe('Error handling and edge cases', () => {
   it('throws on invalid format field', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
     const wf = workflow([A]);
-    const bad = { format: 'unknown', schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION, inventoryKinds: ['A'], nodes: [], edges: [] };
-    expect(() => wf.importWorkflow(bad, 'basic')).toThrow();
+    const bad: z.infer<typeof SchemaBasic> = {
+      // @ts-expect-error
+      format: 'unknown',
+      schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
+      nodes: [],
+      edges: [],
+    };
+    expect(() => wf.importWorkflow('basic', bad)).toThrow();
   });
 
   it('throws on invalid JSON structure (missing nodes array)', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
     const wf = workflow([A]);
-    const bad = { format: 'motif-ts/basic', schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION, inventoryKinds: ['A'], edges: [] };
-    expect(() => wf.importWorkflow(bad, 'basic')).toThrow();
+    // @ts-expect-error
+    const bad: z.infer<typeof SchemaBasic> = {
+      format: 'motif-ts/basic',
+      schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
+      edges: [],
+    };
+    expect(() => wf.importWorkflow('basic', bad)).toThrow();
   });
 
   it('simulates network interruption during import (atomic rollback)', () => {
@@ -24,10 +36,9 @@ describe('Error handling and edge cases', () => {
     const wf = workflow([A, B]);
 
     // prepare payload
-    const basic = {
+    const basic: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
-      inventoryKinds: ['A', 'B'],
       nodes: [
         { id: 'A_a', kind: 'A', name: 'a' },
         { id: 'B_b', kind: 'B', name: 'b' },
@@ -36,7 +47,7 @@ describe('Error handling and edge cases', () => {
     };
 
     // Attempt import and ensure rollback works
-    expect(() => wf.importWorkflow(basic, 'basic')).not.toThrow();
+    expect(() => wf.importWorkflow('basic', basic)).not.toThrow();
     const after = wf.exportWorkflow('basic');
     expect(after.nodes.length).toBe(2);
     expect(after.edges.length).toBe(1);
@@ -45,8 +56,13 @@ describe('Error handling and edge cases', () => {
   it('boundary: import with empty edges', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
     const wf = workflow([A]);
-    const payload = { format: 'motif-ts/basic', schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION, inventoryKinds: ['A'], nodes: [{ id: 'A_a', kind: 'A', name: 'a' }], edges: [] };
-    wf.importWorkflow(payload, 'basic');
+    const payload: z.infer<typeof SchemaBasic> = {
+      format: 'motif-ts/basic',
+      schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
+      nodes: [{ id: 'A_a', kind: 'A', name: 'a' }],
+      edges: [],
+    };
+    wf.importWorkflow('basic', payload);
     const exported = wf.exportWorkflow('basic');
     expect(exported.edges.length).toBe(0);
   });

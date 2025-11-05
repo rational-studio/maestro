@@ -1,5 +1,5 @@
-import { edge } from '../edge';
-import { type Edge } from '../edge/type';
+import { conditionalEdge, edge, transformEdge } from '../edge';
+import { type DeserializableEdgeFactory, type SerializableEdge } from '../edge/type';
 import { CLEANUP_ARRAY_EXECUTED } from '../step/constants';
 import {
   type BuildArgs,
@@ -19,9 +19,14 @@ import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } f
 import { validateInventory } from './validators';
 
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
-  const inventoryMap: Map<string, StepCreatorAny> = new Map();
+  const edgeInventoryMap = new Map<string, DeserializableEdgeFactory>([
+    ['default', edge],
+    ['conditional', conditionalEdge],
+    ['transform', transformEdge],
+  ]);
+  const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
-  const edges: Edge<any, any>[] = [];
+  const edges: SerializableEdge<any, any>[] = [];
   const history: Array<{
     node: StepInstance<any, any, any, any, any>;
     input: unknown;
@@ -41,7 +46,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   validateInventory(inventory);
 
   for (const creator of inventory) {
-    inventoryMap.set(creator.kind, creator);
+    stepInventoryMap.set(creator.kind, creator);
   }
 
   Object.freeze(inventory);
@@ -171,7 +176,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       next: (output) => {
         const validatedOutput = node.outputSchema ? node.outputSchema.parse(output) : undefined;
         const outgoing = edges.filter((e) => e.from === node);
-        const selected: Edge<any, any> | undefined = outgoing[0];
+        const selected: SerializableEdge<any, any> | undefined = outgoing[0];
         if (!selected) {
           const prevOutCleanups = runExitSequence();
           history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
@@ -256,12 +261,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         throw new Error('No next step');
       }
       // Try each outgoing edge and pick the first that allows transition
-      let selectedEdge: Edge<Output, any> | undefined;
+      let selectedEdge: SerializableEdge<Output, any> | undefined;
       let nextInput = undefined;
       for (const e of outgoing) {
         const res = e.validateTransition(validatedOutput);
         if (res.allow) {
-          selectedEdge = e as Edge<Output, any>;
+          selectedEdge = e as SerializableEdge<Output, any>;
           nextInput = res.nextInput;
           break;
         }
@@ -329,9 +334,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]): void => {
     const list = Array.isArray(nodesArg) ? nodesArg : [nodesArg];
-    const allowed = Array.from(inventoryMap.keys()).join(', ');
+    const allowed = Array.from(stepInventoryMap.keys()).join(', ');
     for (const node of list) {
-      if (!inventoryMap.has(node.kind)) {
+      if (!stepInventoryMap.has(node.kind)) {
         throw new Error(
           `Cannot register StepInstance kind '${node.kind}'. Not listed in inventory. Allowed kinds: [${allowed}]`,
         );
@@ -341,7 +346,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const connect = <I, O>(
-    fromOrEdge: StepInstance<any, O, any, any, any> | Edge<I, O>,
+    fromOrEdge: StepInstance<any, O, any, any, any> | SerializableEdge<I, O>,
     to?: StepInstance<I, any, any, any, any>,
     unidirectional = false,
   ): void => {
@@ -357,10 +362,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
           `Cannot connect to unregistered StepInstance '${to.id}'. Register the instance before connecting.`,
         );
       }
-      const e = edge<any, any>(from, to, unidirectional);
+      const e = edge(from, to, unidirectional);
       edges.push(e);
     } else {
-      const e = fromOrEdge as Edge<I, O>;
+      const e = fromOrEdge as SerializableEdge<I, O>;
       if (!nodes.has(e.from)) {
         throw new Error(
           `Cannot connect from unregistered StepInstance '${e.from.id}'. Register the instance before connecting.`,
@@ -376,8 +381,8 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const start = <I, O, C, Api extends StepAPI, Store>(node: StepInstance<I, O, C, Api, Store>) => {
-    if (!inventoryMap.has(node.kind)) {
-      const allowed = Array.from(inventoryMap.keys()).join(', ');
+    if (!stepInventoryMap.has(node.kind)) {
+      const allowed = Array.from(stepInventoryMap.keys()).join(', ');
       throw new Error(
         `Cannot start on StepInstance kind '${node.kind}'. Not listed in inventory. Allowed kinds: [${allowed}]`,
       );
@@ -418,7 +423,8 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   // wire import/export handlers from separate module
   const { exportWorkflow, importWorkflow } = createImportExportHandlers({
-    inventoryMap,
+    stepInventoryMap,
+    edgeInventoryMap,
     nodes,
     edges,
     history,

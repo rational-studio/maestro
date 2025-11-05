@@ -14,22 +14,19 @@ export const SchemaNode = z.object({
   name: z.string(),
   config: z.unknown().optional(),
 });
-// Support both new and old edge formats for backward compatibility.
-// Use discriminated union by 'kind' to ensure conditional/transform require 'expr'.
+
 export const SchemaEdge = z.object({
   kind: z.string(),
   from: z.string(),
   to: z.string(),
   unidirectional: z.boolean(),
+  config: z.unknown().optional(),
 });
+
 export const SchemaBase = z.object({
   schemaVersion: z.literal(WORKFLOW_EXPORT_SCHEMA_VERSION),
-  libraryVersion: z.string().optional(),
-  inventoryKinds: z.array(z.string()),
   nodes: z.array(SchemaNode),
   edges: z.array(SchemaEdge),
-  $schema: z.string().optional(),
-  $id: z.string().optional(),
 });
 export const SchemaBasic = SchemaBase.extend({ format: z.literal('motif-ts/basic') });
 export const SchemaFullState = SchemaBase.extend({

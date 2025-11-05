@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 
 import { conditionalEdge, step, transformEdge, workflow } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION, type SchemaBasic } from '../../src/workflow/constants';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/constants';
 
 describe('Import/Export with edge kinds and expressions', () => {
   it('exports edges with kind and expr fields', () => {
@@ -32,14 +32,14 @@ describe('Import/Export with edge kinds and expressions', () => {
     const basic = wf.exportWorkflow('basic');
     // Validate that edges carry kind and expr correctly
     expect(basic.edges).toEqual([
-      { kind: 'conditional', from: emitter.id, to: even.id, unidirectional: false, expr: 'out % 2 === 0' },
-      { kind: 'conditional', from: emitter.id, to: odd.id, unidirectional: false, expr: 'out % 2 !== 0' },
+      { kind: 'conditional', from: emitter.id, to: even.id, unidirectional: false, config: 'out % 2 === 0' },
+      { kind: 'conditional', from: emitter.id, to: odd.id, unidirectional: false, config: 'out % 2 !== 0' },
       {
         kind: 'transform',
         from: a.id,
         to: b.id,
         unidirectional: false,
-        expr: '{ username: out.name, years: out.age }',
+        config: '{ username: out.name, years: out.age }',
       },
     ]);
   });
@@ -59,15 +59,20 @@ describe('Import/Export with edge kinds and expressions', () => {
     const payload = {
       format: 'motif-ts/basic' as const,
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,
-      inventoryKinds: ['Emitter', 'Even', 'Odd'],
       nodes: [
         { id: 'Emitter_emitter', kind: 'Emitter', name: 'emitter' },
         { id: 'Even_even', kind: 'Even', name: 'even' },
         { id: 'Odd_odd', kind: 'Odd', name: 'odd' },
       ],
       edges: [
-        { kind: 'conditional', from: 'Emitter_emitter', to: 'Even_even', unidirectional: false, expr: 'out % 2 === 0' },
-        { kind: 'conditional', from: 'Emitter_emitter', to: 'Odd_odd', unidirectional: false, expr: 'out % 2 !== 0' },
+        {
+          kind: 'conditional',
+          from: 'Emitter_emitter',
+          to: 'Even_even',
+          unidirectional: false,
+          config: 'out % 2 === 0',
+        },
+        { kind: 'conditional', from: 'Emitter_emitter', to: 'Odd_odd', unidirectional: false, config: 'out % 2 !== 0' },
       ],
     };
 

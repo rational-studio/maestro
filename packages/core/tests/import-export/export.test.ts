@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import z from 'zod/v4';
-import { step, workflow, conditionalEdge, transformEdge } from '../../src';
-import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/types';
+
+import { conditionalEdge, step, transformEdge, workflow } from '../../src';
+import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/workflow/constants';
 
 describe('Export workflow - basic and full', () => {
   it('exports basic configuration with nodes and edges', () => {
@@ -16,7 +17,7 @@ describe('Export workflow - basic and full', () => {
 
     wf.start(a);
     const basic = wf.exportWorkflow('basic');
-    // Snapshot ensures full structure correctness (schemaVersion, inventoryKinds, nodes, edges, etc.)
+    // Snapshot ensures full structure correctness (schemaVersion, nodes, edges, etc.)
     expect(basic).toMatchSnapshot('basic-export');
     // Minimal invariant check to ensure snapshot remains meaningful
     expect(basic.schemaVersion).toBe(WORKFLOW_EXPORT_SCHEMA_VERSION);
@@ -43,11 +44,17 @@ describe('Export workflow - basic and full', () => {
   });
 
   it('exports edges with conditional and transform kinds', () => {
-    const Emitter = step({ kind: 'Emitter', outputSchema: z.number() }, ({ next }) => ({ emit: (n) => next(n) }));
+    const Emitter = step({ kind: 'Emitter', outputSchema: z.number() }, ({ next }) => ({
+      emit: (n: number) => next(n),
+    }));
     const Even = step({ kind: 'Even', inputSchema: z.number() }, ({ input }) => ({ val: input }));
     const Odd = step({ kind: 'Odd', inputSchema: z.number() }, ({ input }) => ({ val: input }));
-    const A = step({ kind: 'A', outputSchema: z.object({ name: z.string(), age: z.number() }) }, ({ next }) => ({ go: (n, a) => next({ name: n, age: a }) }));
-    const B = step({ kind: 'B', inputSchema: z.object({ username: z.string(), years: z.number() }) }, ({ input }) => ({ who: () => input.username + ':' + input.years }));
+    const A = step({ kind: 'A', outputSchema: z.object({ name: z.string(), age: z.number() }) }, ({ next }) => ({
+      go: (n: string, a: number) => next({ name: n, age: a }),
+    }));
+    const B = step({ kind: 'B', inputSchema: z.object({ username: z.string(), years: z.number() }) }, ({ input }) => ({
+      who: () => input.username + ':' + input.years,
+    }));
 
     const wf = workflow([Emitter, Even, Odd, A, B]);
     const emitter = Emitter('emitter');
@@ -62,9 +69,15 @@ describe('Export workflow - basic and full', () => {
 
     const basic = wf.exportWorkflow('basic');
     expect(basic.edges).toEqual([
-      { kind: 'conditional', from: emitter.id, to: even.id, unidirectional: false, expr: 'out % 2 === 0' },
-      { kind: 'conditional', from: emitter.id, to: odd.id, unidirectional: false, expr: 'out % 2 !== 0' },
-      { kind: 'transform', from: a.id, to: b.id, unidirectional: false, expr: '{ username: out.name, years: out.age }' },
+      { kind: 'conditional', from: emitter.id, to: even.id, unidirectional: false, config: 'out % 2 === 0' },
+      { kind: 'conditional', from: emitter.id, to: odd.id, unidirectional: false, config: 'out % 2 !== 0' },
+      {
+        kind: 'transform',
+        from: a.id,
+        to: b.id,
+        unidirectional: false,
+        config: '{ username: out.name, years: out.age }',
+      },
     ]);
   });
   it('exports when not started (no current node)', () => {

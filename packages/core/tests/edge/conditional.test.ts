@@ -22,6 +22,7 @@ describe('ConditionalEdge: predicate controls transition', () => {
     const even = AcceptEven();
     const odd = AcceptOdd();
     orchestrator.register([emitter, even, odd]);
+
     // use expression-based predicate referencing env { out }
     orchestrator.connect(conditionalEdge(emitter, even, 'out % 2 === 0'));
     orchestrator.connect(conditionalEdge(emitter, odd, 'out % 2 !== 0'));
