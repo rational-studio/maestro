@@ -10,7 +10,7 @@ describe('Import workflow - basic and full', () => {
     const A = step({ kind: 'A', outputSchema: z.number() }, ({ next }) => ({ go: () => next(1) }));
     const B = step({ kind: 'B', inputSchema: z.number() }, () => ({ done: true }));
 
-    const wf = persist(workflow(), [A, B]);
+    const wf = persist(workflow([A, B]));
 
     const importPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
@@ -33,7 +33,7 @@ describe('Import workflow - basic and full', () => {
       run: () => next(1),
     }));
     const T = step({ kind: 'T', inputSchema: z.number() }, ({ input }) => ({ val: input }));
-    const wf = persist(workflow(), [S, T]);
+    const wf = persist(workflow([S, T]));
 
     const importPayload: z.infer<typeof SchemaFullState> = {
       format: 'motif-ts/full',
@@ -57,7 +57,7 @@ describe('Import workflow - basic and full', () => {
 
   it('rejects invalid schema version', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
-    const wf = persist(workflow(), [A]);
+    const wf = persist(workflow([A]));
     const badPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
       // @ts-expect-error
@@ -70,7 +70,7 @@ describe('Import workflow - basic and full', () => {
 
   it('rejects when edge references unknown node', () => {
     const A = step({ kind: 'A' }, () => ({ ok: true }));
-    const wf = persist(workflow(), [A]);
+    const wf = persist(workflow([A]));
     const badPayload: z.infer<typeof SchemaBasic> = {
       format: 'motif-ts/basic',
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,

@@ -1,4 +1,5 @@
 import { conditionalEdge, step, workflow, type CurrentStep } from '@motif-ts/core';
+import { devtools } from '@motif-ts/middleware';
 import { useWorkflow } from '@motif-ts/react';
 import { useState, type ReactNode } from 'react';
 import { z } from 'zod';
@@ -83,12 +84,14 @@ export default function StepsDemo() {
     const input = InputCreator('输入');
     const confirm = ConfirmCreator('确认');
     const done = DoneCreator('完成');
-    return workflow([InputCreator, ConfirmCreator, DoneCreator])
-      .register([input, confirm, done])
-      .connect(input, confirm)
-      .connect(conditionalEdge(confirm, done, 'out.confirmed === true'))
-      .connect(conditionalEdge(confirm, input, 'out.confirmed === false'))
-      .start(input);
+    return devtools(
+      workflow([InputCreator, ConfirmCreator, DoneCreator])
+        .register([input, confirm, done])
+        .connect(input, confirm)
+        .connect(conditionalEdge(confirm, done, 'out.confirmed === true'))
+        .connect(conditionalEdge(confirm, input, 'out.confirmed === false'))
+        .start(input),
+    );
   });
 
   const current = useWorkflow(flow);

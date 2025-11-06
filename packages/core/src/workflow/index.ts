@@ -15,13 +15,16 @@ import { type WorkflowContext } from './context';
 import { computeNextEffects, initialEffects, type EffectDef } from './effects';
 import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
+import { validateInventory } from './validators';
 
-export function workflow<const Creators extends readonly StepCreatorAny[]>(): WorkflowAPI<Creators> {
+export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
+  const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
   const edges: Edge<any, any>[] = [];
   const history: Array<{
     node: StepInstance<any, any, any, any, any>;
     input: unknown;
+    output: unknown;
     // transitionOut cleanups to be executed when user navigates back to this step
     outCleanupOnBack: CleanupFn[];
   }> = [];
@@ -33,6 +36,16 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
   let currentApi: StepAPI | undefined;
   let context: WorkflowContext | undefined;
   let contextVersionCounter = 0;
+  let isLifeCyclePaused = false;
+
+  // Validate duplicate kinds with detailed error information
+  validateInventory(inventory);
+
+  for (const creator of inventory) {
+    stepInventoryMap.set(creator.kind, creator);
+  }
+
+  Object.freeze(inventory);
 
   const subscribe = (handler: (kind: string, name: string, status: TransitionStatus) => void) => {
     subscribers.add(handler);
@@ -77,9 +90,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
     context.hasRunIn = true;
   };
 
-  // Exit sequence: run transitionOut hooks (once, before exit), collect their cleanups to run when coming back.  134   const runExitSequence = (): CleanupFn[] => {
+  // Exit sequence: run transitionOut hooks (once, before exit), collect their cleanups to run when coming back.
   // Also run effect cleanups and transitionIn cleanups immediately.
   const runExitSequence = (): CleanupFnArray => {
+    if (isLifeCyclePaused) {
+      return [];
+    }
     const outCleanupsForBack: CleanupFnArray = [];
     // mark as not yet executed; used to flush late async cleanups
     outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] = false;
@@ -162,7 +178,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
         const selected: Edge<any, any> | undefined = outgoing[0];
         if (!selected) {
           const prevOutCleanups = runExitSequence();
-          history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
+          history.push({ node, input: inputForNode, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
           return;
         }
         const nextNode = selected.to;
@@ -171,7 +187,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
           nextInput = nextNode.inputSchema.parse(validatedOutput);
         }
         const prevOutCleanups = runExitSequence();
-        history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
+        history.push({ node, input: inputForNode, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
         transitionInto(nextNode, nextInput, false, []);
       },
     };
@@ -195,7 +211,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
     }
 
     // Effect diffing / rerun
-    context.effects = computeNextEffects(context.effects, effectsDefs);
+    if (!isLifeCyclePaused) {
+      context.effects = computeNextEffects(context.effects, effectsDefs);
+    }
 
     currentApi = api;
     currentStep = {
@@ -204,8 +222,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
       name: current.name,
       state: currentApi,
     } as CurrentStepStarted<Creators>;
+
+    if(!isLifeCyclePaused) {
     // Notify ready on store-driven rebuild
     notify(node.kind, node.name, 'ready');
+    }
   };
 
   const transitionInto = <Input, Output, Config, Api extends StepAPI, Store>(
@@ -214,6 +235,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
     isBack: boolean,
     backCleanups: CleanupFn[],
   ) => {
+    if (isLifeCyclePaused) {
+      return;
+    }
     // Do NOT run exit sequence here; it is handled by callers (next/back)
     current = node;
     currentStep = {
@@ -263,7 +287,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
         nextInput = nextNode.inputSchema.parse(nextInput);
       }
       const prevOutCleanups = runExitSequence();
-      history.push({ node, input, outCleanupOnBack: prevOutCleanups });
+      history.push({ node, input, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
       transitionInto(nextNode, nextInput, false, []);
     };
 
@@ -317,7 +341,13 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
 
   const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]) => {
     const list = Array.isArray(nodesArg) ? nodesArg : [nodesArg];
+    const allowed = Array.from(stepInventoryMap.keys()).join(', ');
     for (const node of list) {
+      if (!stepInventoryMap.has(node.kind)) {
+        throw new Error(
+          `Cannot register StepInstance kind '${node.kind}'. Not listed in inventory. Allowed kinds: [${allowed}]`,
+        );
+      }
       nodes.add(node);
     }
     return workflowApis;
@@ -407,11 +437,28 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(): Wo
       nodes,
       edges,
       history,
+      stepInventoryMap,
       getCurrentNode,
       getContext,
       setNotStarted,
       runExitSequence,
       transitionInto,
+      notify,
+      pauseLifeCycle: () => {
+        isLifeCyclePaused = true;
+        // cleanup existing effects
+        if (context) {
+          for (const eff of context.effects) {
+            if (typeof eff.cleanup === 'function') {
+              eff.cleanup();
+            }
+          }
+          context.effects = [];
+        }
+      },
+      resumeLifeCycle: () => {
+        isLifeCyclePaused = false;
+      },
     },
   };
 

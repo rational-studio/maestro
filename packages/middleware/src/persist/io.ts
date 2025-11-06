@@ -1,7 +1,14 @@
+import {
+  type CleanupFn,
+  type DeserializableEdgeFunc,
+  type Edge,
+  type SerializableEdge,
+  type StepAPI,
+  type StepCreatorAny,
+  type StepInstance,
+} from '@motif-ts/core';
 import type z from 'zod/v4';
 
-import { type DeserializableEdgeFunc, type Edge, type SerializableEdge } from '../edge/type';
-import { type CleanupFn, type StepAPI, type StepCreatorAny, type StepInstance } from '../step/types';
 import { SchemaBasic, SchemaFullState, WORKFLOW_EXPORT_SCHEMA_VERSION } from './constants';
 
 type WorkflowExport = z.infer<typeof SchemaBasic | typeof SchemaFullState>;
@@ -28,7 +35,7 @@ type HandlersDeps = {
 };
 
 function isEdgeSerializable<I, O>(edge: Edge<I, O>): edge is SerializableEdge<I, O> {
-  return Boolean(edge.serializable) && typeof (edge as any).serialize !== 'function';
+  return Boolean(edge.serializable) && typeof (edge as any).serialize === 'function';
 }
 
 export function createImportExportHandlers(deps: HandlersDeps) {

@@ -19,7 +19,7 @@ describe('Import/Export with edge kinds and expressions', () => {
       who: () => input.username + ':' + input.years,
     }));
 
-    const wf = persist(workflow(), [Emitter, Even, Odd, A, B]);
+    const wf = persist(workflow([Emitter, Even, Odd, A, B]));
     const emitter = Emitter('emitter');
     const even = Even('even');
     const odd = Odd('odd');
@@ -56,7 +56,7 @@ describe('Import/Export with edge kinds and expressions', () => {
       id: () => input,
     }));
 
-    const wf = persist(workflow(), [Emitter, Even, Odd]);
+    const wf = persist(workflow([Emitter, Even, Odd]));
     const payload = {
       format: 'motif-ts/basic' as const,
       schemaVersion: WORKFLOW_EXPORT_SCHEMA_VERSION,

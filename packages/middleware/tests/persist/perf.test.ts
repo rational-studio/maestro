@@ -8,7 +8,7 @@ import { WORKFLOW_EXPORT_SCHEMA_VERSION } from '../../src/persist/constants';
 describe('Performance - large workflow export/import', () => {
   it('handles large number of nodes and edges efficiently', () => {
     const Node = step({ kind: 'N', outputSchema: z.number() }, ({ next }) => ({ go: (x: number) => next(x) }));
-    const wf = persist(workflow(), [Node]);
+    const wf = persist(workflow([Node]));
 
     const nodes = [];
     for (let i = 0; i < 1000; i++) {

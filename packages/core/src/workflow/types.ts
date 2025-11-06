@@ -81,8 +81,10 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
     history: {
       node: StepInstance<any, any, any, any, any>;
       input: unknown;
+      output: unknown;
       outCleanupOnBack: CleanupFn[];
     }[];
+    stepInventoryMap: Map<string, StepCreatorAny>;
     getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
     getContext: () => WorkflowContext | undefined;
     setNotStarted: () => void;
@@ -93,5 +95,8 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       isBack: boolean,
       backCleanups: CleanupFn[],
     ) => void;
+    notify: (kind: string, name: string, status: TransitionStatus) => void;
+    pauseLifeCycle: () => void;
+    resumeLifeCycle: () => void;
   };
 }
