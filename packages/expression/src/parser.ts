@@ -1,5 +1,6 @@
 import { raiseParseError } from './errors';
-import type { ASTNode, BinaryNode, LogicalNode, ObjectProperty, SpreadElement, Token } from './types';
+import { tokenize } from './lexer';
+import type { ASTNode, BinaryNode, LogicalNode, ObjectProperty, SpreadElement, Token, UnaryNode } from './types';
 
 export interface ParserState {
   tokens: Token[];
@@ -59,6 +60,19 @@ const parsePrimary = (ps: ParserState): ASTNode | null => {
   if (tk.kind === 'identifier') {
     next(ps);
     return { type: 'Identifier', name: tk.value };
+  }
+  if (tk.kind === 'template') {
+    next(ps);
+    const t = tk.template!;
+    const exprAsts = t.expressionsSrc.map((src) => {
+      const subTokens = tokenize(src);
+      const subAst = parse(subTokens, src);
+      if (!subAst) {
+        raiseParseError(src);
+      }
+      return subAst as ASTNode;
+    });
+    return { type: 'TemplateLiteral', quasis: t.quasis, rawQuasis: t.rawQuasis, expressions: exprAsts };
   }
   if (isPunct(ps, '(')) {
     next(ps);
@@ -137,6 +151,100 @@ const parseObject = (ps: ParserState): ASTNode => {
 const parsePostfix = (ps: ParserState, base: ASTNode | null): ASTNode | null => {
   let expr = base;
   while (expr) {
+    // Tagged template: Identifier/MemberExpression immediately followed by template token
+    if (peek(ps)?.kind === 'template') {
+      const tk = next(ps);
+      const t = tk.template!;
+      const exprAsts = t.expressionsSrc.map((src) => {
+        const subTokens = tokenize(src);
+        const subAst = parse(subTokens, src);
+        if (!subAst) {
+          raiseParseError(src);
+        }
+        return subAst as ASTNode;
+      });
+      const quasi: ASTNode = {
+        type: 'TemplateLiteral',
+        quasis: t.quasis,
+        rawQuasis: t.rawQuasis,
+        expressions: exprAsts,
+      } as any;
+      expr = { type: 'TaggedTemplateExpression', tag: expr, quasi } as any;
+      continue;
+    }
+
+    // Optional chaining: '?.', '?[', '?.('
+    if (isPunct(ps, '?')) {
+      const nextTk = ps.tokens[ps.pos + 1];
+      // If '?' is part of conditional (not followed by '.', '[' or '('), stop postfix parsing
+      if (
+        !nextTk ||
+        nextTk.kind !== 'punct' ||
+        (nextTk.value !== '.' && nextTk.value !== '[' && nextTk.value !== '(')
+      ) {
+        break;
+      }
+      next(ps); // consume '?'
+      if (isPunct(ps, '.')) {
+        next(ps); // consume '.'
+        // Support '?.[' (optional computed property)
+        if (isPunct(ps, '[')) {
+          next(ps);
+          const propExpr = mustNode(ps, parseExpression(ps));
+          if (!isPunct(ps, ']')) {
+            raiseParseError(ps.src);
+          }
+          next(ps);
+          expr = { type: 'MemberExpression', object: expr, property: propExpr, computed: true, optional: true };
+          continue;
+        }
+        // Otherwise, expect identifier for '?.prop'
+        const prop = peek(ps);
+        if (!prop || prop.kind !== 'identifier') {
+          raiseParseError(ps.src);
+        }
+        next(ps);
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: { type: 'Literal', value: prop.value },
+          computed: false,
+          optional: true,
+        };
+        continue;
+      }
+      if (isPunct(ps, '[')) {
+        next(ps);
+        const propExpr = mustNode(ps, parseExpression(ps));
+        if (!isPunct(ps, ']')) {
+          raiseParseError(ps.src);
+        }
+        next(ps);
+        expr = { type: 'MemberExpression', object: expr, property: propExpr, computed: true, optional: true };
+        continue;
+      }
+      if (isPunct(ps, '(')) {
+        next(ps);
+        const args: ASTNode[] = [];
+        if (!isPunct(ps, ')')) {
+          while (true) {
+            const arg = parseExpression(ps);
+            if (arg) {
+              args.push(arg);
+            }
+            if (isPunct(ps, ',')) {
+              next(ps);
+              continue;
+            }
+            break;
+          }
+        }
+        expectPunct(ps, ')');
+        expr = { type: 'CallExpression', callee: expr, args, optional: true };
+        continue;
+      }
+    }
+
     if (isPunct(ps, '.')) {
       next(ps);
       const prop = peek(ps);
@@ -190,13 +298,17 @@ const parsePostfix = (ps: ParserState, base: ASTNode | null): ASTNode | null => 
 const prefixOps = new Set(['+', '-', '!']);
 
 const parseUnary = (ps: ParserState): ASTNode | null => {
-  if (isOp(ps) && prefixOps.has(peek(ps).value)) {
-    const op = next(ps).value as '+' | '-' | '!';
-    const arg = mustNode(ps, parseUnary(ps));
-    return { type: 'UnaryExpression', operator: op, argument: arg };
+  const tk = peek(ps);
+  if (!tk) {
+    return null;
   }
-  const prim = parsePrimary(ps);
-  return parsePostfix(ps, prim);
+  if (tk.kind === 'operator' && prefixOps.has(tk.value)) {
+    next(ps);
+    const arg = mustNode(ps, parseUnary(ps));
+    return { type: 'UnaryExpression', operator: tk.value as UnaryNode['operator'], argument: arg };
+  }
+  const primary = parsePrimary(ps);
+  return parsePostfix(ps, primary);
 };
 
 const precedence: Record<string, number> = {
@@ -262,20 +374,19 @@ const parseConditional = (ps: ParserState, test: ASTNode): ASTNode => {
 };
 
 export const parseExpression = (ps: ParserState): ASTNode | null => {
-  const unary = parseUnary(ps);
-  if (!unary) {
+  const lhs = parseUnary(ps);
+  if (!lhs) {
     return null;
   }
-  const bin = parseBinaryRHS(ps, 1, unary);
-  return parseConditional(ps, bin);
+  const rhs = parseBinaryRHS(ps, 1, lhs);
+  return parseConditional(ps, rhs);
 };
 
 export const parse = (tokens: Token[], src: string): ASTNode | null => {
   const ps = createParser(tokens, src);
-  const ast = parseExpression(ps);
-  if (!ast) {
-    return null;
+  const node = parseExpression(ps);
+  if (!node || !eof(ps)) {
+    raiseParseError(src);
   }
-  // allow trailing EOF only
-  return ast;
+  return node;
 };

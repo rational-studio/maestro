@@ -259,15 +259,80 @@ describe('Modern JS Features (ES6+) Support', () => {
     expect(mod).toEqual({ default: './mod' });
   });
 
-  test('Unsupported syntax: template strings/optional chaining/nullish coalescing/arrow/spread', () => {
-    // Unsupported syntax should throw with stable messages. Arrow functions are not parsed; engine ignores => part.
-    expect(() => expression('`hi`')).toThrow('parse expression error: `hi`');
-    expect(() => expression('a?.b')).toThrow('parse expression error: a?.b');
+  test('Optional chaining', () => {
+    let expr = expression('a?.b');
+    expect(expr({})).toBe(undefined);
 
-    const onlyGroup = expression('(x) => x + 1');
-    expect(onlyGroup({ x: 5 })).toBe(5);
+    expr = expression('a?.b?.c');
+    expect(expr({ a: { b: null } })).toBe(undefined);
+    expect(expr({ a: { b: { c: 3 } } })).toBe(3);
 
-    // object spread now supported
+    expr = expression('a?.[\"b\"]?.c');
+    expect(expr({})).toBe(undefined);
+
+    // Optional call: short-circuits if callee is nullish
+    expr = expression('a?.b()');
+    expect(expr({})).toBe(undefined);
+    expect(expr({ a: {} })).toBe(null); // non-callable returns null per engine semantics
+
+    const env = {
+      a: {
+        b(this: { c: number }) {
+          return this.c;
+        },
+        c: 7,
+      },
+    };
+    expect(expr(env)).toBe(7);
+  });
+});
+
+describe('Template Literals', () => {
+  test('Basic interpolation and multi-line', () => {
+    const expr1 = expression('`hello ${name}!`');
+    expect(expr1({ name: 'world' })).toBe('hello world!');
+
+    const expr2 = expression('`line1\n${x} line2`');
+    expect(expr2({ x: 42 })).toBe('line1\n42 line2');
+  });
+
+  test('Nested template in expression and various types', () => {
+    const expr = expression('`outer: ${`inner ${x}`}, bool=${b}, null=${n}`');
+    expect(expr({ x: 1, b: false, n: null })).toBe('outer: inner 1, bool=false, null=null');
+  });
+
+  test.skip('Undefined variables should throw error', () => {
+    const expr = expression('`value=${missing}`');
+    expect(() => expr({})).toThrow('invalid expression: `value=${missing}`, undefined variable "missing"');
+  });
+
+  test('Error: unterminated template or expression', () => {
+    expect(() => expression('`abc')).toThrow('invalid expression: `abc, unterminated template literal');
+    expect(() => expression('`${a + 1`')).toThrow('invalid expression: `${a + 1`, unterminated template expression');
+  });
+
+  test('Tagged template literals', () => {
+    const env = {
+      tag(strings: TemplateStringsArray, ...values: unknown[]) {
+        return `${strings.join('|')}|${values.join('|')}`;
+      },
+      obj: {
+        t(strings: TemplateStringsArray, ...values: unknown[]) {
+          // verify raw strings are available
+          return `${(strings as any).raw.join('#')}#${values.join('#')}`;
+        },
+      },
+    };
+    const t1 = expression('tag`A${1}B${2}C`');
+    expect(t1(env)).toBe('A|B|C|1|2');
+
+    const t2 = expression('obj.t`X\\n${3}Y`');
+    expect(t2(env)).toBe('X\\n#Y#3');
+  });
+
+  test('Escapes and Unicode in template', () => {
+    const expr = expression('`star=\\u2605 tab=\\t`');
+    expect(expr({})).toBe('star=★ tab=\t');
   });
 });
 

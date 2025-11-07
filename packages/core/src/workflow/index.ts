@@ -223,9 +223,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       state: currentApi,
     } as CurrentStepStarted<Creators>;
 
-    if(!isLifeCyclePaused) {
-    // Notify ready on store-driven rebuild
-    notify(node.kind, node.name, 'ready');
+    if (!isLifeCyclePaused) {
+      // Notify ready on store-driven rebuild
+      notify(node.kind, node.name, 'ready');
     }
   };
 

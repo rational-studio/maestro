@@ -30,7 +30,8 @@ const getProp = (obj: unknown, key: PropertyKey): unknown => {
 const evalMember = (node: MemberNode, env: Env): unknown => {
   const obj = evaluate(node.object, env);
   if (obj === null || obj === undefined) {
-    return null;
+    // For optional chaining, missing object yields undefined like JS; otherwise null
+    return node.optional ? undefined : null;
   }
   const key: PropertyKey = node.computed
     ? toKey(evaluate(node.property, env))
@@ -44,19 +45,26 @@ const evalCall = (node: CallNode, env: Env): unknown => {
   let thisArg: any = undefined;
 
   if (node.callee.type === 'MemberExpression') {
-    thisArg = evaluate(node.callee.object, env);
+    const calleeMember = node.callee;
+    thisArg = evaluate(calleeMember.object, env);
     if (thisArg === null || thisArg === undefined) {
-      return null;
+      // Optional member access before call short-circuits to undefined
+      return calleeMember.optional ? undefined : null;
     }
-    const key: PropertyKey = node.callee.computed
-      ? toKey(evaluate(node.callee.property, env))
-      : String((node.callee.property as LiteralNode).value);
+    const key: PropertyKey = calleeMember.computed
+      ? toKey(evaluate(calleeMember.property, env))
+      : String((calleeMember.property as LiteralNode).value);
     fn = getProp(thisArg, key);
   } else {
     fn = evaluate(node.callee, env);
   }
 
   if (typeof fn !== 'function') {
+    // Keep engine's backward-compat behavior: non-callable returns null
+    // For optional call (?.()), short-circuit to undefined when callee is nullish
+    if (node.optional && (fn === null || fn === undefined)) {
+      return undefined;
+    }
     return null;
   }
   const args = node.args.map((a) => evaluate(a, env));
@@ -177,6 +185,45 @@ export const evaluate = (node: ASTNode, env: Env): unknown => {
         }
       }
       return obj;
+    }
+    case 'TemplateLiteral': {
+      const cooked = node.quasis;
+      const exprs = node.expressions.map((e) => evaluate(e, env));
+      let out = cooked[0] ?? '';
+      for (let i = 0; i < exprs.length; i++) {
+        out += String(exprs[i]) + (cooked[i + 1] ?? '');
+      }
+      return out;
+    }
+    case 'TaggedTemplateExpression': {
+      // Resolve tag function and this binding similar to CallExpression
+      let fn: any;
+      let thisArg: any = undefined;
+      const tag = node.tag as any;
+      if (tag.type === 'MemberExpression') {
+        thisArg = evaluate(tag.object, env);
+        if (thisArg === null || thisArg === undefined) {
+          return null;
+        }
+        const key: PropertyKey = tag.computed
+          ? toKey(evaluate(tag.property, env))
+          : String((tag.property as LiteralNode).value);
+        fn = getProp(thisArg, key);
+      } else {
+        fn = evaluate(tag, env);
+      }
+      if (typeof fn !== 'function') {
+        return null;
+      }
+      const strings = [...node.quasi.quasis];
+      // attach raw per JS semantics
+      (strings as any).raw = [...node.quasi.rawQuasis];
+      const values = node.quasi.expressions.map((e) => evaluate(e, env));
+      try {
+        return fn.apply(thisArg, [strings, ...values]);
+      } catch {
+        return null;
+      }
     }
   }
 };

@@ -9,19 +9,22 @@ describe('Workflow INTERNAL API', () => {
     const transitionIn = vi.fn();
     const transitionOut = vi.fn();
 
-    const A = step({ kind: 'A' }, ({ effect: defineEffect, transitionIn: defineTransitionIn, transitionOut: defineTransitionOut }) => {
-      defineEffect(effect, []);
-      defineTransitionIn(transitionIn);
-      defineTransitionOut(transitionOut);
-      return {};
-    });
+    const A = step(
+      { kind: 'A' },
+      ({ effect: defineEffect, transitionIn: defineTransitionIn, transitionOut: defineTransitionOut }) => {
+        defineEffect(effect, []);
+        defineTransitionIn(transitionIn);
+        defineTransitionOut(transitionOut);
+        return {};
+      },
+    );
 
     const wf = workflow([A]);
     const a = A();
     wf.register(a);
 
     // Pause lifecycle
-    (wf.INTERNAL).pauseLifeCycle();
+    wf.INTERNAL.pauseLifeCycle();
 
     // Start the workflow
     wf.start(a);
@@ -31,7 +34,7 @@ describe('Workflow INTERNAL API', () => {
     expect(transitionIn).not.toHaveBeenCalled();
 
     // Resume lifecycle
-    (wf.INTERNAL).resumeLifeCycle();
+    wf.INTERNAL.resumeLifeCycle();
 
     // Re-start the workflow to trigger the lifecycle hooks
     wf.start(a);
