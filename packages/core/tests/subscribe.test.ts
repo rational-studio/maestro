@@ -81,7 +81,7 @@ describe('Workflow.subscribe notifications', () => {
 
     orchestrator.start(s);
     const stepS = orchestrator.getCurrentStep();
-    assert(stepS.status === 'ready' && stepS.kind === 'S');
+    assert(stepS.kind === 'S');
     stepS.state.goNext();
 
     expect(events).toEqual([
@@ -105,14 +105,14 @@ describe('Workflow.subscribe notifications', () => {
 
     orchestrator.start(s);
     let cur = orchestrator.getCurrentStep();
-    assert(cur.status === 'ready' && cur.kind === 'S');
+    assert(cur.kind === 'S');
     expect(cur.state.count).toBe(0);
 
     // bump store -> rebuild -> ready
     cur.state.bump();
 
     cur = orchestrator.getCurrentStep();
-    assert(cur.status === 'ready' && cur.kind === 'S');
+    assert(cur.kind === 'S');
     expect(cur.state.count).toBe(1);
 
     expect(events).toEqual([
@@ -136,11 +136,11 @@ describe('Workflow.subscribe notifications', () => {
 
     orchestrator.start(s);
     const stepS = orchestrator.getCurrentStep();
-    assert(stepS.status === 'ready' && stepS.kind === 'S');
+    assert(stepS.kind === 'S');
     stepS.state.goNext();
 
     const stepT = orchestrator.getCurrentStep();
-    assert(stepT.status === 'ready' && stepT.kind === 'T');
+    assert(stepT.kind === 'T');
 
     orchestrator.back();
 

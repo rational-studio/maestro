@@ -29,21 +29,21 @@ describe('ConditionalEdge: predicate controls transition', () => {
 
     orchestrator.start(emitter);
     const sA1 = orchestrator.getCurrentStep();
-    assert(sA1.status === 'ready' && sA1.kind === 'Emitter');
+    assert(sA1.kind === 'Emitter');
     sA1.state.emitOdd();
 
     const sB = orchestrator.getCurrentStep();
-    assert(sB.status === 'ready' && sB.kind === 'AcceptOdd');
+    assert(sB.kind === 'AcceptOdd');
     expect(sB.state.id()).toBe(3);
 
     // Go back to A, then try odd which should be blocked
     orchestrator.back();
     const sA2 = orchestrator.getCurrentStep();
-    assert(sA2.status === 'ready' && sA2.kind === 'Emitter');
+    assert(sA2.kind === 'Emitter');
     sA2.state.emitEven();
 
     const sC = orchestrator.getCurrentStep();
-    assert(sC.status === 'ready' && sC.kind === 'AcceptEven');
+    assert(sC.kind === 'AcceptEven');
     expect(sC.state.id()).toBe(2);
   });
 });

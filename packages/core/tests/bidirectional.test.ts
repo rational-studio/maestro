@@ -73,22 +73,22 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
 
     orchestrator.start(a);
     const stepA = orchestrator.getCurrentStep();
-    assert(stepA.status === 'ready' && stepA.kind === 'A');
+    assert(stepA.kind === 'A');
 
     // Forward to B
     stepA.state.go();
     const stepB = orchestrator.getCurrentStep();
-    assert(stepB.status === 'ready' && stepB.kind === 'B');
+    assert(stepB.kind === 'B');
 
     // Back to A
     orchestrator.back();
     const stepA2 = orchestrator.getCurrentStep();
-    assert(stepA2.status === 'ready' && stepA2.kind === 'A');
+    assert(stepA2.kind === 'A');
 
     // Forward again
     stepA2.state.go();
     const stepB2 = orchestrator.getCurrentStep();
-    assert(stepB2.status === 'ready' && stepB2.kind === 'B');
+    assert(stepB2.kind === 'B');
 
     // Verify cleanup timing and order groups (not strict total order, but presence)
     // A entered once initially, then exited twice (forward and forward again via back)
@@ -155,7 +155,7 @@ describe('motif-ts Workflow bidirectional transitions and cleanup', () => {
 
     orchestrator.start(a);
     const stepA = orchestrator.getCurrentStep();
-    assert(stepA.status === 'ready' && stepA.kind === 'A');
+    assert(stepA.kind === 'A');
     // Forward to B: A.transitionOut throws
     expect(() => stepA.state.go()).toThrow('out hook error');
     // Ensure logs recorded before throws

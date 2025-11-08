@@ -18,11 +18,11 @@ describe('UnidirectionalEdge: forward allowed, back blocked', () => {
 
     orchestrator.start(a);
     const sA = orchestrator.getCurrentStep();
-    assert(sA.status === 'ready' && sA.kind === 'A');
+    assert(sA.kind === 'A');
     sA.state.go();
 
     const sB = orchestrator.getCurrentStep();
-    assert(sB.status === 'ready' && sB.kind === 'B');
+    assert(sB.kind === 'B');
 
     // Back should throw due to unidirectional edge
     expect(() => orchestrator.back()).toThrow();

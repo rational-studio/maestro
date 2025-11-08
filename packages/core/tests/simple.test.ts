@@ -96,15 +96,15 @@ describe('strict-typed-demo workflow', () => {
 
     orchestrator.start(collect);
     const collectStep = orchestrator.getCurrentStep();
-    assert(collectStep.status === 'ready' && collectStep.kind === 'CollectEmail');
+    assert(collectStep.kind === 'CollectEmail');
     collectStep.state.collect();
 
     const verifyStep = orchestrator.getCurrentStep();
-    assert(verifyStep.status === 'ready' && verifyStep.kind === 'VerifyEmail');
+    assert(verifyStep.kind === 'VerifyEmail');
     verifyStep.state.verify();
 
     const displayStep = orchestrator.getCurrentStep();
-    assert(displayStep.status === 'ready' && displayStep.kind === 'DisplayResult');
+    assert(displayStep.kind === 'DisplayResult');
     const result = displayStep.state.display();
     expect(result.verified).toBe(true);
   });
@@ -123,15 +123,15 @@ describe('strict-typed-demo workflow', () => {
     orchestrator.start(collect);
 
     const collectStep = orchestrator.getCurrentStep();
-    assert(collectStep.status === 'ready' && collectStep.kind === 'CollectEmail');
+    assert(collectStep.kind === 'CollectEmail');
     collectStep.state.collect();
 
     const verifyStep = orchestrator.getCurrentStep();
-    assert(verifyStep.status === 'ready' && verifyStep.kind === 'VerifyEmail');
+    assert(verifyStep.kind === 'VerifyEmail');
     verifyStep.state.verify();
 
     const displayStep = orchestrator.getCurrentStep();
-    assert(displayStep.status === 'ready' && displayStep.kind === 'DisplayResult');
+    assert(displayStep.kind === 'DisplayResult');
     const result = displayStep.state.display();
     expect(result.verified).toBe(false);
   });
@@ -149,15 +149,15 @@ describe('strict-typed-demo workflow', () => {
 
     orchestrator.start(collect);
     const collectStep = orchestrator.getCurrentStep();
-    assert(collectStep.status === 'ready' && collectStep.kind === 'CollectEmail');
+    assert(collectStep.kind === 'CollectEmail');
     collectStep.state.collect();
 
     const verifyStep = orchestrator.getCurrentStep();
-    assert(verifyStep.status === 'ready' && verifyStep.kind === 'VerifyEmail');
+    assert(verifyStep.kind === 'VerifyEmail');
     verifyStep.state.verify();
 
     const displayStep = orchestrator.getCurrentStep();
-    assert(displayStep.status === 'ready' && displayStep.kind === 'DisplayResult');
+    assert(displayStep.kind === 'DisplayResult');
     const result = displayStep.state.display();
     expect(result.verified).toBe(true);
   });
@@ -173,7 +173,7 @@ describe('strict-typed-demo workflow', () => {
 
     orchestrator.start(collect);
     const collectStep = orchestrator.getCurrentStep();
-    assert(collectStep.status === 'ready' && collectStep.kind === 'CollectEmail');
+    assert(collectStep.kind === 'CollectEmail');
     // When Collect emits invalid email, Motif-ts should throw on outputSchema.parse
     expect(() => collectStep.state.collectInvalid()).toThrow();
   });

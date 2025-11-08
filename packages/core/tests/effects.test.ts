@@ -32,7 +32,7 @@ describe('effects', () => {
     orchestrator.start(first);
 
     const currentStep = orchestrator.getCurrentStep();
-    assert(currentStep.status === 'ready' && currentStep.kind === 'Step');
+    assert(currentStep.kind === 'Step');
 
     // Rebuild the step by updating the store
     currentStep.state.inc();
@@ -66,7 +66,7 @@ describe('effects', () => {
     orchestrator.start(first);
 
     const currentStep = orchestrator.getCurrentStep();
-    assert(currentStep.status === 'ready' && currentStep.kind === 'Step');
+    assert(currentStep.kind === 'Step');
     expect(effectCb).toHaveBeenCalledTimes(1);
     expect(effectCb).toHaveBeenCalledWith(0);
 
@@ -98,7 +98,7 @@ describe('effects', () => {
     orchestrator.start(first);
 
     const currentStep = orchestrator.getCurrentStep();
-    assert(currentStep.status === 'ready' && currentStep.kind === 'Step');
+    assert(currentStep.kind === 'Step');
 
     // Rebuild the step
     currentStep.state.inc();

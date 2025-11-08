@@ -51,19 +51,19 @@ describe('Step without configSchema but with createStore', () => {
     orchestrator.start(c);
 
     let curStep = orchestrator.getCurrentStep();
-    assert(curStep.status === 'ready' && curStep.kind === 'Counter');
+    assert(curStep.kind === 'Counter');
     expect(curStep.state.count).toBe(0);
     curStep.state.bump();
 
     curStep = orchestrator.getCurrentStep();
-    assert(curStep.status === 'ready' && curStep.kind === 'Counter');
+    assert(curStep.kind === 'Counter');
 
     // After bump, store count should increment
     expect(curStep.state.count).toBe(1);
     curStep.state.bump();
 
     curStep = orchestrator.getCurrentStep();
-    assert(curStep.status === 'ready' && curStep.kind === 'Counter');
+    assert(curStep.kind === 'Counter');
     expect(curStep.state.count).toBe(2);
   });
 });

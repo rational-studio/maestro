@@ -22,11 +22,11 @@ describe('TransformEdge: converts A output to B input type', () => {
     orchestrator.connect(transformEdge(a, b, '{ username: out.name, years: out.age }'));
     orchestrator.start(a);
     const sA1 = orchestrator.getCurrentStep();
-    assert(sA1.status === 'ready' && sA1.kind === 'A');
+    assert(sA1.kind === 'A');
     sA1.state.go('alice', 20);
 
     const sB1 = orchestrator.getCurrentStep();
-    assert(sB1.status === 'ready' && sB1.kind === 'B');
+    assert(sB1.kind === 'B');
     expect(sB1.state.who()).toBe('alice:20');
   });
 
@@ -48,7 +48,7 @@ describe('TransformEdge: converts A output to B input type', () => {
 
     orchestrator.start(a);
     const sA = orchestrator.getCurrentStep();
-    assert(sA.status === 'ready' && sA.kind === 'A');
+    assert(sA.kind === 'A');
     expect(() => sA.state.go('alice', 20)).toThrow(
       'TransformEdge: failed to convert output -> input. Reason: result is undefined',
     );

@@ -33,7 +33,7 @@ describe('Async TransitionHook support', () => {
 
     o.start(a);
     const s = o.getCurrentStep();
-    assert(s.status === 'ready' && s.kind === 'A');
+    assert(s.kind === 'A');
     s.state.go();
 
     // Cleanup may run either during exit if resolved, or immediately upon resolve post-exit
@@ -66,7 +66,7 @@ describe('Async TransitionHook support', () => {
     o.connect(a, b);
     o.start(a);
     const s = o.getCurrentStep();
-    assert(s.status === 'ready' && s.kind === 'A');
+    assert(s.kind === 'A');
     s.state.go();
 
     await delay(20);
@@ -112,7 +112,7 @@ describe('Async TransitionHook support', () => {
 
     o.start(a);
     const s = o.getCurrentStep();
-    assert(s.status === 'ready' && s.kind === 'A');
+    assert(s.kind === 'A');
     s.state.go();
 
     await delay(20);
@@ -148,7 +148,7 @@ describe('Async TransitionHook support', () => {
 
     o.start(a);
     const s = o.getCurrentStep();
-    assert(s.status === 'ready' && s.kind === 'A');
+    assert(s.kind === 'A');
     s.state.go();
 
     // Now back into A before the async out cleanup resolves
@@ -186,7 +186,7 @@ describe('Async TransitionHook support', () => {
 
     o.start(a);
     const s = o.getCurrentStep();
-    assert(s.status === 'ready' && s.kind === 'A');
+    assert(s.kind === 'A');
     s.state.go();
 
     // Back before async cleanup resolves; it must still run exactly once

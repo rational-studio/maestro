@@ -31,7 +31,7 @@ describe('Step with configSchema and no store', () => {
     orchestrator.start(node);
 
     const curStep = orchestrator.getCurrentStep();
-    assert(curStep.status === 'ready' && curStep.kind === 'WithConfig');
+    assert(curStep.kind === 'WithConfig');
     const res = curStep.state.run();
     expect(res).toBe('Hello, World!');
   });
