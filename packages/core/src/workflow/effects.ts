@@ -9,22 +9,10 @@ export type EffectDef = { deps?: DependencyList; run: () => CleanupFn };
 export type EffectEntry = { deps?: DependencyList; run: () => CleanupFn; cleanup?: CleanupFn };
 
 /**
- * Initialize effects by executing each effect once and capturing its cleanup.
- */
-export function initialEffects(effectsDefs: EffectDef[]): EffectEntry[] {
-  const nextEffects: EffectEntry[] = [];
-  for (let i = 0; i < effectsDefs.length; i++) {
-    const def = effectsDefs[i];
-    const cleanup: CleanupFn = def.run();
-    nextEffects[i] = { deps: def.deps, run: def.run, cleanup };
-  }
-  return nextEffects;
-}
-
-/**
  * Compute the next set of effects by diffing dependency arrays and re-running effects when needed.
+ * If prevEffects is not provided, all effects are run.
  */
-export function computeNextEffects(prevEffects: EffectEntry[], effectsDefs: EffectDef[]): EffectEntry[] {
+export function processEffects(effectsDefs: EffectDef[], prevEffects: EffectEntry[] = []): EffectEntry[] {
   const nextEffects: EffectEntry[] = [];
   const max = Math.max(prevEffects.length, effectsDefs.length);
   for (let i = 0; i < max; i++) {

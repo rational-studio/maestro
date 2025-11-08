@@ -13,8 +13,8 @@ import {
 } from '../step/types';
 import { _ASSERT } from '../utils';
 import { type WorkflowContext } from './context';
-import { computeNextEffects, initialEffects, type EffectDef } from './effects';
-import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
+import { processEffects, type EffectDef } from './effects';
+import { type CurrentStep, type CurrentStepStarted, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
 import { validateInventory } from './validators';
 
@@ -209,7 +209,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     }
 
     // Effect diffing / rerun
-    context.effects = computeNextEffects(context.effects, effectsDefs);
+    context.effects = processEffects(effectsDefs, context.effects);
 
     currentStep = {
       status: 'ready',
@@ -307,7 +307,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     runTransitionInOnce();
 
     // Run initial effects (first render)
-    context.effects = initialEffects(effectsDefs);
+    context.effects = processEffects(effectsDefs);
 
     // Subscribe to data layer changes to rebuild on any change
 
