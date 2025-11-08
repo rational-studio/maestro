@@ -18,6 +18,8 @@ import { type CurrentStepStatus, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
 import { validateInventory } from './validators';
 
+const noop = () => void 0;
+
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
   // #region No need to be serialized for time-traveling
   const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
@@ -61,6 +63,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     }
   };
 
+  const setCurrentStep = (currentStepStatus: CurrentStepStatus<Creators>) => {
+    currentStep = currentStepStatus;
+    notify(currentStep);
+  };
+
   const runTransitionInOnce = () => {
     if (!context || context.hasRunIn) {
       return;
@@ -100,11 +107,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     if (currentStepInstance) {
       _ASSERT(currentStep?.status === 'ready', 'currentStep.status must be ready');
       _ASSERT(currentStep.name === currentStepInstance.name, 'currentStep.name must be currentStepInstance.name');
-      currentStep = {
+      setCurrentStep({
         ...currentStep,
         status: 'transitionOut',
-      };
-      notify(currentStep);
+      });
     }
     if (context) {
       for (let i = 0; i < context.outHooks.length; i++) {
@@ -137,7 +143,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       for (const cleanup of context.inCleanups) {
         safeInvokeCleanup(cleanup);
       }
-      context.storeUnsub?.();
+      context.storeUnsub();
       context = undefined;
     }
     return outCleanupsForBack;
@@ -200,7 +206,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         outHooks,
         outCleanupOnBack: [],
         effects: [],
-        storeUnsub: undefined,
+        storeUnsub: noop,
         currentInput: inputForNode,
         version: ++contextVersionCounter,
       };
@@ -211,13 +217,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     // Effect diffing / rerun
     context.effects = processEffects(effectsDefs, context.effects);
 
-    currentStep = {
+    setCurrentStep({
       status: 'ready',
       kind: currentStepInstance.kind,
       name: currentStepInstance.name,
       state: api,
-    };
-    notify(currentStep);
+    });
   };
 
   const transitionInto = <Input, Output, Config, Api extends StepAPI, Store>(
@@ -283,13 +288,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     };
     const api = node.build(args);
 
-    currentStep = {
+    setCurrentStep({
       status: 'transitionIn',
       kind: currentStepInstance.kind,
       name: currentStepInstance.name,
       state: api,
-    } as CurrentStepStatus<Creators>;
-    notify(currentStep);
+    } as CurrentStepStatus<Creators>);
 
     // Initialize context for this step
     context = {
@@ -299,7 +303,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       outHooks,
       outCleanupOnBack: [],
       effects: [],
-      storeUnsub: undefined,
+      storeUnsub: noop,
       currentInput: input,
       version: ++contextVersionCounter,
     };
@@ -311,17 +315,17 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
     // Subscribe to data layer changes to rebuild on any change
 
-    if (node.storeApi) {
-      context.storeUnsub = node.storeApi.subscribe(() => {
-        rebuildCurrent();
-      });
-    }
+    context.storeUnsub = node.storeApi
+      ? node.storeApi.subscribe(() => {
+          rebuildCurrent();
+        })
+      : noop;
 
-    currentStep = {
+    _ASSERT(currentStep?.status === 'transitionIn', 'currentStep.status must be transitionIn');
+    setCurrentStep({
       ...currentStep,
       status: 'ready',
-    };
-    notify(currentStep);
+    });
   };
 
   const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]) => {
@@ -438,7 +442,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       getContext,
       runExitSequence,
       transitionInto,
-      notify,
+      setCurrentStep,
       stop,
     },
   };

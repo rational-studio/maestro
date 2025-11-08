@@ -15,7 +15,7 @@ export type WorkflowContext = {
   /** Effect registry with deps and cleanup */
   effects: EffectEntry[];
   /** Unsubscribe function for data layer (store) subscription */
-  storeUnsub?: () => void;
+  storeUnsub: () => void;
   /** Current input for this step */
   currentInput?: unknown;
   /** Version token to guard async resolutions against stale contexts */

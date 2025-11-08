@@ -89,6 +89,6 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       backCleanups: CleanupFn[],
     ) => void;
     stop: () => void;
-    notify: (currentStep: CurrentStepStatus<Creators>) => void;
+    setCurrentStep: (currentStep: CurrentStepStatus<Creators>) => void;
   };
 }
