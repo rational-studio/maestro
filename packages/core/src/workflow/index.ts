@@ -11,6 +11,7 @@ import {
   type StepInstance,
   type TransitionHook,
 } from '../step/types';
+import { _ASSERT } from '../utils';
 import { type WorkflowContext } from './context';
 import { computeNextEffects, initialEffects, type EffectDef } from './effects';
 import { type CurrentStep, type CurrentStepStarted, type TransitionStatus, type WorkflowAPI } from './types';
@@ -18,25 +19,25 @@ import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } f
 import { validateInventory } from './validators';
 
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
+  // #region No need to be serialized for time-traveling
   const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
   const edges: Edge<any, any>[] = [];
+  const subscribers = new Set<(currentStep: CurrentStepStarted<Creators>) => void>();
   const history: Array<{
     node: StepInstance<any, any, any, any, any>;
     input: unknown;
-    output: unknown;
     // transitionOut cleanups to be executed when user navigates back to this step
     outCleanupOnBack: CleanupFn[];
   }> = [];
-  const subscribers = new Set<(kind: string, name: string, status: TransitionStatus) => void>();
-
-  // States
-  let currentStep: CurrentStep<Creators> = { status: 'notStarted' };
-  let current: StepInstance<any, any, any, any, any> | undefined;
-  let currentApi: StepAPI | undefined;
   let context: WorkflowContext | undefined;
   let contextVersionCounter = 0;
-  let isLifeCyclePaused = false;
+  //#endregion
+
+  // #region States, need to be serialized for time-traveling
+  let currentStepInstance: StepInstance<any, any, any, any, any> | undefined;
+  let currentStep: CurrentStep<Creators> = { status: 'notStarted' };
+  // #endregion
 
   // Validate duplicate kinds with detailed error information
   validateInventory(inventory);
@@ -47,16 +48,16 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   Object.freeze(inventory);
 
-  const subscribe = (handler: (kind: string, name: string, status: TransitionStatus) => void) => {
+  const subscribe = (handler: (currentStep: CurrentStepStarted<Creators>) => void) => {
     subscribers.add(handler);
     return () => {
       subscribers.delete(handler);
     };
   };
 
-  const notify = (kind: string, name: string, status: TransitionStatus) => {
+  const notify = (currentStep: CurrentStepStarted<Creators>) => {
     for (const cb of subscribers) {
-      cb(kind, name, status);
+      cb(currentStep);
     }
   };
 
@@ -93,20 +94,17 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   // Exit sequence: run transitionOut hooks (once, before exit), collect their cleanups to run when coming back.
   // Also run effect cleanups and transitionIn cleanups immediately.
   const runExitSequence = (): CleanupFnArray => {
-    if (isLifeCyclePaused) {
-      return [];
-    }
     const outCleanupsForBack: CleanupFnArray = [];
     // mark as not yet executed; used to flush late async cleanups
     outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] = false;
-    if (current) {
+    if (currentStepInstance) {
+      _ASSERT(currentStep.status === 'ready', 'currentStep.status must be ready');
+      _ASSERT(currentStep.name === currentStepInstance.name, 'currentStep.name must be currentStepInstance.name');
       currentStep = {
+        ...currentStep,
         status: 'transitionOut',
-        kind: current.kind,
-        name: current.name,
-        state: currentApi,
       } as CurrentStepStarted<Creators>;
-      notify(current.kind, current.name, 'transitionOut');
+      notify(currentStep);
     }
     if (context) {
       for (let i = 0; i < context.outHooks.length; i++) {
@@ -146,10 +144,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const rebuildCurrent = () => {
-    if (!current) {
+    if (!currentStepInstance) {
       return;
     }
-    const node = current;
+    const node = currentStepInstance;
     const inputForNode = context?.currentInput;
 
     const inHooks: TransitionHook[] = [];
@@ -178,7 +176,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         const selected: Edge<any, any> | undefined = outgoing[0];
         if (!selected) {
           const prevOutCleanups = runExitSequence();
-          history.push({ node, input: inputForNode, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
+          history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
           return;
         }
         const nextNode = selected.to;
@@ -187,7 +185,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
           nextInput = nextNode.inputSchema.parse(validatedOutput);
         }
         const prevOutCleanups = runExitSequence();
-        history.push({ node, input: inputForNode, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
+        history.push({ node, input: inputForNode, outCleanupOnBack: prevOutCleanups });
         transitionInto(nextNode, nextInput, false, []);
       },
     };
@@ -211,22 +209,15 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     }
 
     // Effect diffing / rerun
-    if (!isLifeCyclePaused) {
-      context.effects = computeNextEffects(context.effects, effectsDefs);
-    }
+    context.effects = computeNextEffects(context.effects, effectsDefs);
 
-    currentApi = api;
     currentStep = {
       status: 'ready',
-      kind: current.kind,
-      name: current.name,
-      state: currentApi,
+      kind: currentStepInstance.kind,
+      name: currentStepInstance.name,
+      state: api,
     } as CurrentStepStarted<Creators>;
-
-    if (!isLifeCyclePaused) {
-      // Notify ready on store-driven rebuild
-      notify(node.kind, node.name, 'ready');
-    }
+    notify(currentStep);
   };
 
   const transitionInto = <Input, Output, Config, Api extends StepAPI, Store>(
@@ -235,19 +226,8 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     isBack: boolean,
     backCleanups: CleanupFn[],
   ) => {
-    if (isLifeCyclePaused) {
-      return;
-    }
     // Do NOT run exit sequence here; it is handled by callers (next/back)
-    current = node;
-    currentStep = {
-      status: 'transitionIn',
-      kind: current.kind,
-      name: current.name,
-      state: currentApi,
-    } as CurrentStepStarted<Creators>;
-    // Notify transition entering
-    notify(node.kind, node.name, 'transitionIn');
+    currentStepInstance = node;
 
     if (isBack) {
       // execute transitionOut cleanups of the step we are returning to
@@ -287,7 +267,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         nextInput = nextNode.inputSchema.parse(nextInput);
       }
       const prevOutCleanups = runExitSequence();
-      history.push({ node, input, output: validatedOutput, outCleanupOnBack: prevOutCleanups });
+      history.push({ node, input, outCleanupOnBack: prevOutCleanups });
       transitionInto(nextNode, nextInput, false, []);
     };
 
@@ -302,6 +282,14 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       next,
     };
     const api = node.build(args);
+
+    currentStep = {
+      status: 'transitionIn',
+      kind: currentStepInstance.kind,
+      name: currentStepInstance.name,
+      state: api,
+    } as CurrentStepStarted<Creators>;
+    notify(currentStep);
 
     // Initialize context for this step
     context = {
@@ -329,14 +317,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       });
     }
 
-    currentApi = api;
     currentStep = {
-      status: 'ready' as const,
-      kind: current.kind,
-      name: current.name,
-      state: currentApi,
+      ...currentStep,
+      status: 'ready',
     } as CurrentStepStarted<Creators>;
-    notify(node.kind, node.name, 'ready');
+    notify(currentStep);
   };
 
   const register = (nodesArg: ReturnType<Creators[number]> | readonly ReturnType<Creators[number]>[]) => {
@@ -398,11 +383,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const getCurrentStep = () => currentStep;
-  const getCurrentNode = () => current;
+  const getCurrentNode = () => currentStepInstance;
   const getContext = () => context;
   const setNotStarted = () => {
-    current = undefined;
-    currentApi = undefined;
+    currentStepInstance = undefined;
     context = undefined;
     currentStep = { status: 'notStarted' };
   };
@@ -412,11 +396,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     if (!prev) {
       return;
     }
-    const connecting = edges.find((e) => e.from === prev.node && e.to === current);
+    const connecting = edges.find((e) => e.from === prev.node && e.to === currentStepInstance);
     // Enforce edge reversibility: find the edge previously used to reach current from prev
     if (connecting && connecting.unidirectional) {
       throw new Error(
-        `Back navigation is not allowed: edge from '${prev.node.id}' to '${current?.id}' is unidirectional`,
+        `Back navigation is not allowed: edge from '${prev.node.id}' to '${currentStepInstance?.id}' is unidirectional`,
       );
     }
     // Run exit sequence for the current step (we are leaving it)
@@ -433,7 +417,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     subscribe,
     back,
     // For Internal Use
-    INTERNAL: {
+    $$INTERNAL: {
       nodes,
       edges,
       history,
@@ -444,21 +428,6 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       runExitSequence,
       transitionInto,
       notify,
-      pauseLifeCycle: () => {
-        isLifeCyclePaused = true;
-        // cleanup existing effects
-        if (context) {
-          for (const eff of context.effects) {
-            if (typeof eff.cleanup === 'function') {
-              eff.cleanup();
-            }
-          }
-          context.effects = [];
-        }
-      },
-      resumeLifeCycle: () => {
-        isLifeCyclePaused = false;
-      },
     },
   };
 

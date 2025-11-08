@@ -70,18 +70,17 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Subscribe to the current step.
    * @param callback The callback to call when the current step changes.
    */
-  subscribe(callback: (kind: string, name: string, status: TransitionStatus) => void): () => void;
+  subscribe(callback: (currentStep: CurrentStepStarted<Creators>) => void): () => void;
   /**
    * Back to the previous step.
    */
   back(): void;
-  INTERNAL: {
+  $$INTERNAL: {
     nodes: Set<StepInstance<any, any, any, any, any>>;
     edges: Edge<any, any>[];
     history: {
       node: StepInstance<any, any, any, any, any>;
       input: unknown;
-      output: unknown;
       outCleanupOnBack: CleanupFn[];
     }[];
     stepInventoryMap: Map<string, StepCreatorAny>;
@@ -95,8 +94,6 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       isBack: boolean,
       backCleanups: CleanupFn[],
     ) => void;
-    notify: (kind: string, name: string, status: TransitionStatus) => void;
-    pauseLifeCycle: () => void;
-    resumeLifeCycle: () => void;
+    notify: (currentStep: CurrentStepStarted<Creators>) => void;
   };
 }

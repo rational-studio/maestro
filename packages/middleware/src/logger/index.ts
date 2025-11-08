@@ -28,7 +28,7 @@ export default function loggerMiddleware<const Creators extends readonly StepCre
   workflow: WorkflowAPI<Creators>,
   options: LoggerOptions = {},
 ): WorkflowAPI<Creators> {
-  const { connect, getCurrentStep, subscribe, back, INTERNAL } = workflow;
+  const { connect, getCurrentStep, subscribe, back, $$INTERNAL } = workflow;
 
   const prefix = options.prefix ?? '[motif] ';
   const palette = options.palette;
@@ -38,10 +38,14 @@ export default function loggerMiddleware<const Creators extends readonly StepCre
     console.log(`%c${prefix}${label}`, styleFor(label, palette), ...(showPayload ? args : []));
   };
 
-  subscribe((kind, name, status) => {
+  subscribe((currentStep) => {
     const category: keyof typeof defaultPalette =
-      status === 'transitionIn' ? 'TransitionIn' : status === 'ready' ? 'Ready' : 'TransitionOut';
-    log(category, `${kind}:${name}`, { status });
+      currentStep.status === 'transitionIn'
+        ? 'TransitionIn'
+        : currentStep.status === 'ready'
+          ? 'Ready'
+          : 'TransitionOut';
+    log(category, `${currentStep.kind}:${currentStep.name}`, { status: currentStep.status });
   });
 
   return {
@@ -65,6 +69,6 @@ export default function loggerMiddleware<const Creators extends readonly StepCre
       log('Back');
       return back();
     },
-    INTERNAL,
+    $$INTERNAL,
   } satisfies WorkflowAPI<Creators>;
 }

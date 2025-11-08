@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "motif": "pnpm --filter motif-ts",
-    "test:all": "pnpm -r test"
+    "test:all": "pnpm -r test",
+    "format:all": "pnpm -r lint:fix && pnpm -r format"
   },
   "devDependencies": {
     "pnpm": "^10.20.0"
