@@ -14,7 +14,7 @@ import {
 import { _ASSERT } from '../utils';
 import { type WorkflowContext } from './context';
 import { processEffects, type EffectDef } from './effects';
-import { type CurrentStep, type CurrentStepStarted, type WorkflowAPI } from './types';
+import { type CurrentStepStatus, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
 import { validateInventory } from './validators';
 
@@ -23,7 +23,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   const stepInventoryMap: Map<string, StepCreatorAny> = new Map();
   const nodes = new Set<StepInstance<any, any, any, any, any>>();
   const edges: Edge<any, any>[] = [];
-  const subscribers = new Set<(currentStep: CurrentStepStarted<Creators>) => void>();
+  const subscribers = new Set<(currentStep: CurrentStepStatus<Creators>) => void>();
   const history: Array<{
     node: StepInstance<any, any, any, any, any>;
     input: unknown;
@@ -36,7 +36,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   // #region States, need to be serialized for time-traveling
   let currentStepInstance: StepInstance<any, any, any, any, any> | undefined;
-  let currentStep: CurrentStep<Creators> = { status: 'notStarted' };
+  let currentStep: CurrentStepStatus<Creators> | undefined;
   // #endregion
 
   // Validate duplicate kinds with detailed error information
@@ -48,14 +48,14 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
   Object.freeze(inventory);
 
-  const subscribe = (handler: (currentStep: CurrentStepStarted<Creators>) => void) => {
+  const subscribe = (handler: (currentStep: CurrentStepStatus<Creators>) => void) => {
     subscribers.add(handler);
     return () => {
       subscribers.delete(handler);
     };
   };
 
-  const notify = (currentStep: CurrentStepStarted<Creators>) => {
+  const notify = (currentStep: CurrentStepStatus<Creators>) => {
     for (const cb of subscribers) {
       cb(currentStep);
     }
@@ -98,12 +98,12 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     // mark as not yet executed; used to flush late async cleanups
     outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] = false;
     if (currentStepInstance) {
-      _ASSERT(currentStep.status === 'ready', 'currentStep.status must be ready');
+      _ASSERT(currentStep?.status === 'ready', 'currentStep.status must be ready');
       _ASSERT(currentStep.name === currentStepInstance.name, 'currentStep.name must be currentStepInstance.name');
       currentStep = {
         ...currentStep,
         status: 'transitionOut',
-      } as CurrentStepStarted<Creators>;
+      };
       notify(currentStep);
     }
     if (context) {
@@ -216,7 +216,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       kind: currentStepInstance.kind,
       name: currentStepInstance.name,
       state: api,
-    } as CurrentStepStarted<Creators>;
+    };
     notify(currentStep);
   };
 
@@ -288,7 +288,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       kind: currentStepInstance.kind,
       name: currentStepInstance.name,
       state: api,
-    } as CurrentStepStarted<Creators>;
+    } as CurrentStepStatus<Creators>;
     notify(currentStep);
 
     // Initialize context for this step
@@ -320,7 +320,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     currentStep = {
       ...currentStep,
       status: 'ready',
-    } as CurrentStepStarted<Creators>;
+    };
     notify(currentStep);
   };
 
@@ -382,13 +382,25 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     return workflowApis;
   };
 
-  const getCurrentStep = () => currentStep;
-  const getCurrentNode = () => currentStepInstance;
-  const getContext = () => context;
-  const setNotStarted = () => {
+  const getCurrentStep = () => {
+    _ASSERT(currentStep !== undefined, 'currentStep must be defined');
+    return currentStep;
+  };
+
+  const getCurrentNode = () => {
+    _ASSERT(currentStepInstance !== undefined, 'currentStepInstance must be defined');
+    return currentStepInstance;
+  };
+
+  const getContext = () => {
+    _ASSERT(context !== undefined, 'context must be defined');
+    return context;
+  };
+
+  const stop = () => {
     currentStepInstance = undefined;
     context = undefined;
-    currentStep = { status: 'notStarted' };
+    currentStep = undefined;
   };
 
   const back = () => {
@@ -424,10 +436,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       stepInventoryMap,
       getCurrentNode,
       getContext,
-      setNotStarted,
       runExitSequence,
       transitionInto,
       notify,
+      stop,
     },
   };
 

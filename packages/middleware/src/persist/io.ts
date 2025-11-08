@@ -24,7 +24,7 @@ type HandlersDeps = {
   getCurrentStep: () => { status: 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut' } | any;
   getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
   getContext: () => any;
-  setNotStarted: () => void;
+  stop: () => void;
   runExitSequence: () => CleanupFn[];
   transitionInto: <Input, Output, Config, Api extends StepAPI, Store>(
     node: StepInstance<Input, Output, Config, Api, Store>,
@@ -48,7 +48,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
     getCurrentStep,
     getCurrentNode,
     getContext,
-    setNotStarted,
+    stop,
     runExitSequence,
     transitionInto,
   } = deps;
@@ -172,7 +172,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
         // Clear runtime state and apply
         runExitSequence();
         history.splice(0, history.length);
-        setNotStarted();
+        stop();
         nodes.clear();
         for (const n of nextNodesById.values()) {
           nodes.add(n);
@@ -258,7 +258,7 @@ export function createImportExportHandlers(deps: HandlersDeps) {
 
         const curId = parsed.state.current.nodeId;
         if (!curId) {
-          setNotStarted();
+          stop();
           return;
         }
         const curNode = nextNodesById.get(curId);

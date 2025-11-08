@@ -42,9 +42,9 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
     getCurrentStep,
     getCurrentNode: $$INTERNAL.getCurrentNode,
     getContext: $$INTERNAL.getContext,
-    setNotStarted: $$INTERNAL.setNotStarted,
     runExitSequence: $$INTERNAL.runExitSequence,
     transitionInto: $$INTERNAL.transitionInto,
+    stop: $$INTERNAL.stop,
   });
 
   return {

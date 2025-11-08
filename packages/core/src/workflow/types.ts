@@ -8,11 +8,10 @@ import {
 } from '../step/types';
 import { type WorkflowContext } from './context';
 
-export type TransitionStatus = 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut';
+export type TransitionStatus = 'transitionIn' | 'ready' | 'transitionOut';
 
-export type CurrentStepNotStarted = { status: 'notStarted' };
-export type CurrentStepStarted<Creators extends readonly StepCreatorAny[]> = {
-  status: Exclude<TransitionStatus, 'notStarted'>;
+export type CurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
+  status: TransitionStatus;
 } & {
   [K in Creators[number]['kind']]: {
     kind: K;
@@ -29,10 +28,6 @@ export type CurrentStepStarted<Creators extends readonly StepCreatorAny[]> = {
     >;
   };
 }[Creators[number]['kind']];
-
-export type CurrentStep<Creators extends readonly StepCreatorAny[]> =
-  | CurrentStepNotStarted
-  | CurrentStepStarted<Creators>;
 
 export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**
@@ -65,12 +60,12 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
   /**
    * Get the current step.
    */
-  getCurrentStep(): CurrentStep<Creators>;
+  getCurrentStep(): CurrentStepStatus<Creators>;
   /**
    * Subscribe to the current step.
    * @param callback The callback to call when the current step changes.
    */
-  subscribe(callback: (currentStep: CurrentStepStarted<Creators>) => void): () => void;
+  subscribe(callback: (currentStep: CurrentStepStatus<Creators>) => void): () => void;
   /**
    * Back to the previous step.
    */
@@ -84,9 +79,8 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       outCleanupOnBack: CleanupFn[];
     }[];
     stepInventoryMap: Map<string, StepCreatorAny>;
-    getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
-    getContext: () => WorkflowContext | undefined;
-    setNotStarted: () => void;
+    getCurrentNode: () => StepInstance<any, any, any, any, any>;
+    getContext: () => WorkflowContext;
     runExitSequence: () => CleanupFnArray;
     transitionInto: (
       node: StepInstance<any, any, any, any, any>,
@@ -94,6 +88,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       isBack: boolean,
       backCleanups: CleanupFn[],
     ) => void;
-    notify: (currentStep: CurrentStepStarted<Creators>) => void;
+    stop: () => void;
+    notify: (currentStep: CurrentStepStatus<Creators>) => void;
   };
 }

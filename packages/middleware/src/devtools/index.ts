@@ -26,7 +26,7 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
   const {
     getCurrentStep,
     subscribe,
-    $$INTERNAL: { nodes, getContext, getCurrentNode, history, transitionInto },
+    $$INTERNAL: { nodes, history, transitionInto },
   } = workflow;
 
   const { name } = options;
@@ -125,9 +125,9 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
                 : typeof message?.payload?.actionIndex === 'number'
                   ? message.payload.actionIndex
                   : -1;
-          if (index >= 0 && index < actions.length) {
-            restoreFromSnapshot(actions[index].state);
-          }
+          // if (index >= 0 && index < actions.length) {
+          //   restoreFromSnapshot(actions[index].state);
+          // }
           break;
         }
         case 'COMMIT': {
