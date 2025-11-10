@@ -15,9 +15,7 @@ function App() {
                 end
                 className={({ isActive }) =>
                   `inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-brand text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-200'
+                    isActive ? 'bg-brand text-white shadow-sm' : 'text-slate-700 hover:bg-slate-200'
                   }`
                 }
               >

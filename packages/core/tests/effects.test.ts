@@ -133,9 +133,9 @@ describe('effects', () => {
           };
         },
       );
-  const first = Step('first');
+      const first = Step('first');
       const orchestrator = workflow([Step]);
-      
+
       orchestrator.register([first]);
       orchestrator.start(first);
 

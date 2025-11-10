@@ -21,8 +21,8 @@ type HandlersDeps = {
   nodes: Set<StepInstance<any, any, any, any, any>>;
   edges: Edge<any, any>[];
   history: Array<{ node: StepInstance<any, any, any, any, any>; input: unknown; outCleanupOnBack: CleanupFn[] }>;
-  getCurrentStep: () => { status: 'notStarted' | 'transitionIn' | 'ready' | 'transitionOut' } | any;
-  getCurrentNode: () => StepInstance<any, any, any, any, any> | undefined;
+  getCurrentStep: () => { status: 'transitionIn' | 'ready' | 'transitionOut' };
+  getCurrentNode: () => StepInstance<any, any, any, any, any>;
   getContext: () => any;
   stop: () => void;
   runExitSequence: () => CleanupFn[];

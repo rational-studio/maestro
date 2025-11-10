@@ -10,32 +10,6 @@ import { type WorkflowContext } from './context';
 
 export type TransitionStatus = 'transitionIn' | 'ready' | 'transitionOut';
 
-/**
- * @internal
- */
-export type PrivateCurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
-  status: TransitionStatus;
-} & {
-  [K in Creators[number]['kind']]: {
-    api: ReturnType<
-      ReturnType<
-        Extract<
-          Creators[number],
-          {
-            kind: K;
-          }
-        >
-      >['build']
-    >;
-    instance: ReturnType<Extract<
-          Creators[number],
-          {
-            kind: K;
-          }
-        >>;
-  };
-}[Creators[number]['kind']];
-
 export type CurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
   status: TransitionStatus;
 } & {
@@ -51,6 +25,14 @@ export type CurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
           }
         >
       >['build']
+    >;
+    instance: ReturnType<
+      Extract<
+        Creators[number],
+        {
+          kind: K;
+        }
+      >
     >;
   };
 }[Creators[number]['kind']];
@@ -91,7 +73,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
    * Subscribe to the current step.
    * @param callback The callback to call when the current step changes.
    */
-  subscribe(callback: (currentStep: CurrentStepStatus<Creators>) => void): () => void;
+  subscribe(callback: (currentStep: CurrentStepStatus<Creators>, isWorkflowRunning: boolean) => void): () => void;
   /**
    * Back to the previous step.
    */
@@ -106,7 +88,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
     }[];
     stepInventoryMap: Map<string, StepCreatorAny>;
     getCurrentNode: () => StepInstance<any, any, any, any, any>;
-    getContext: () => WorkflowContext;
+    getContext: () => WorkflowContext | undefined;
     runExitSequence: () => CleanupFnArray;
     transitionInto: (
       node: StepInstance<any, any, any, any, any>,
@@ -115,7 +97,7 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       backCleanups: CleanupFn[],
     ) => void;
     stop: () => void;
-    setCurrentStep: (currentStep: PrivateCurrentStepStatus<Creators>) => void;
+    setCurrentStep: (currentStep: CurrentStepStatus<Creators>) => void;
     isLifeCyclePaused: () => boolean;
     pauseLifeCycle: () => void;
     resumeLifeCycle: () => void;

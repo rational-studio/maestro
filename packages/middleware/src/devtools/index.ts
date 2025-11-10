@@ -26,7 +26,7 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
   const {
     getCurrentStep,
     subscribe,
-    $$INTERNAL: { nodes, history, transitionInto },
+    $$INTERNAL: { nodes, transitionInto, getCurrentNode, getContext, pauseLifeCycle },
   } = workflow;
 
   const { name } = options;
@@ -39,11 +39,12 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
 
   const devtools = ext.connect({ name: name ?? 'motif workflow' });
 
-  type Snapshot = ReturnType<typeof buildSnapshot>;
-
-  function buildSnapshot() {
-    return getCurrentStep();
-  }
+  type DevtoolsSnapshot = {
+    currentStatus: string;
+    currentNodeId: string;
+    currentInput: unknown;
+    currentState: Record<string, unknown> | undefined;
+  };
 
   function recordAndSend(type: string) {
     const state = buildSnapshot();
@@ -52,60 +53,50 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
     devtools.send({ type: `[motif] ${type} ${callerName || ''}` }, state);
   }
 
-  function restoreFromSnapshot(snap: Snapshot | any) {
+  function buildSnapshot(): DevtoolsSnapshot {
+    const currentNode = getCurrentNode();
+    const current = getCurrentStep();
+    const context = getContext();
+    return {
+      currentStatus: current.status,
+      currentNodeId: currentNode.id,
+      currentInput: context?.currentInput,
+      currentState: currentNode.storeApi?.getState(),
+    };
+  }
+
+  function restoreFromSnapshot({ currentNodeId, currentInput, currentState }: DevtoolsSnapshot) {
     const nodesById = new Map(Array.from(nodes).map((n) => [n.id, n] as const));
-    const targetId: string | undefined = snap?.currentNodeId;
-    const targetNode = targetId ? nodesById.get(targetId) : undefined;
-
-    // reset runtime state
-    // INTERNAL.pauseLifeCycle();
-
-    // restore store states
-    if (snap.stores) {
-      for (const node of nodes) {
-        if (node.storeApi && snap.stores[node.id]) {
-          node.storeApi.setState(snap.stores[node.id]);
-        }
-      }
-    }
-
-    // rebuild history stack
-    history.length = 0;
-    const hist = Array.isArray(snap?.history) ? snap.history : [];
-    for (const h of hist) {
-      const n = nodesById.get(h.nodeId);
-      if (n) {
-        history.push({ node: n, input: h.input, output: h.output, outCleanupOnBack: [] } as any);
-      }
-    }
-
+    const targetNode = nodesById.get(currentNodeId);
     // transition into target node
     if (targetNode) {
-      transitionInto(targetNode, snap?.currentInput, false, []);
+      if (currentState && targetNode.storeApi) {
+        targetNode.storeApi.setState(currentState);
+      }
+      transitionInto(targetNode, currentInput, false, []);
     }
   }
 
-  // Initialize devtools with first snapshot
+  // Initialize devtools with first snapshot (safe even when not started)
   devtools.init(buildSnapshot());
 
   // Monitor connection status and handle time-travel commands
   // @ts-expect-error
   devtools.subscribe((message: any) => {
-    console.log('devtools message', message);
-    if (message?.type === 'START') {
+    if (message.type === 'START') {
       recordAndSend('DEVTOOLS_MONITOR_START');
       return;
     }
-    if (message?.type === 'STOP') {
+    if (message.type === 'STOP') {
       recordAndSend('DEVTOOLS_MONITOR_STOP');
       return;
     }
-    if (message?.type === 'DISPATCH') {
-      const payloadType = message?.payload?.type;
+    if (message.type === 'DISPATCH') {
+      const payloadType = message.payload.type;
       switch (payloadType) {
         case 'JUMP_TO_STATE': {
           // state is a stringified snapshot
-          const next = message?.state;
+          const next = message.state;
           if (typeof next === 'string') {
             try {
               const parsed = JSON.parse(next);
@@ -117,17 +108,11 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
           break;
         }
         case 'JUMP_TO_ACTION': {
-          const index =
-            typeof message?.payload?.actionId === 'number'
-              ? message.payload.actionId
-              : typeof message?.payload?.index === 'number'
-                ? message.payload.index
-                : typeof message?.payload?.actionIndex === 'number'
-                  ? message.payload.actionIndex
-                  : -1;
-          // if (index >= 0 && index < actions.length) {
-          //   restoreFromSnapshot(actions[index].state);
-          // }
+          pauseLifeCycle();
+          if (typeof message.state === 'string') {
+            const parsed = JSON.parse(message.state) as DevtoolsSnapshot;
+            restoreFromSnapshot(parsed);
+          }
           break;
         }
         case 'COMMIT': {
@@ -135,15 +120,17 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
           break;
         }
         case 'ROLLBACK': {
-          // if (first) {
-          //   restoreFromSnapshot(first);
-          // }
+          const next = message.state;
+          if (typeof next === 'string') {
+            const parsed = JSON.parse(next) as DevtoolsSnapshot;
+            restoreFromSnapshot(parsed);
+          }
           break;
         }
         case 'IMPORT_STATE': {
-          const computedStates = message?.payload?.nextLiftedState?.computedStates;
-          const idx = message?.payload?.nextLiftedState?.currentStateIndex;
-          const s = Array.isArray(computedStates) && typeof idx === 'number' ? computedStates[idx]?.state : undefined;
+          const computedStates = message.payload.nextLiftedState.computedStates;
+          const idx = message.payload.nextLiftedState.currentStateIndex;
+          const s = Array.isArray(computedStates) && typeof idx === 'number' ? computedStates[idx].state : undefined;
           if (s) {
             restoreFromSnapshot(s);
           }
@@ -156,8 +143,8 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
   });
 
   // Track runtime status changes
-  subscribe((currentStep) => {
-    if (currentStep.kind === '@@ReduxDevTool') {
+  subscribe((currentStep, isWorkflowRunning) => {
+    if (!isWorkflowRunning) {
       return;
     }
     const type =
