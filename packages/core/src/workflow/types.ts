@@ -10,6 +10,32 @@ import { type WorkflowContext } from './context';
 
 export type TransitionStatus = 'transitionIn' | 'ready' | 'transitionOut';
 
+/**
+ * @internal
+ */
+export type PrivateCurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
+  status: TransitionStatus;
+} & {
+  [K in Creators[number]['kind']]: {
+    api: ReturnType<
+      ReturnType<
+        Extract<
+          Creators[number],
+          {
+            kind: K;
+          }
+        >
+      >['build']
+    >;
+    instance: ReturnType<Extract<
+          Creators[number],
+          {
+            kind: K;
+          }
+        >>;
+  };
+}[Creators[number]['kind']];
+
 export type CurrentStepStatus<Creators extends readonly StepCreatorAny[]> = {
   status: TransitionStatus;
 } & {
@@ -89,6 +115,9 @@ export interface WorkflowAPI<Creators extends readonly StepCreatorAny[]> {
       backCleanups: CleanupFn[],
     ) => void;
     stop: () => void;
-    setCurrentStep: (currentStep: CurrentStepStatus<Creators>) => void;
+    setCurrentStep: (currentStep: PrivateCurrentStepStatus<Creators>) => void;
+    isLifeCyclePaused: () => boolean;
+    pauseLifeCycle: () => void;
+    resumeLifeCycle: () => void;
   };
 }

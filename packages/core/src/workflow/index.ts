@@ -14,11 +14,20 @@ import {
 import { _ASSERT } from '../utils';
 import { type WorkflowContext } from './context';
 import { processEffects, type EffectDef } from './effects';
-import { type CurrentStepStatus, type WorkflowAPI } from './types';
+import { type CurrentStepStatus, type PrivateCurrentStepStatus, type WorkflowAPI } from './types';
 import { handleAsyncError, isPromise, runOutCleanupOnBack, safeInvokeCleanup } from './utils';
 import { validateInventory } from './validators';
 
 const noop = () => void 0;
+
+function convertToPublicCurrentStepStatus<Creators extends readonly StepCreatorAny[]>(currentStep: PrivateCurrentStepStatus<Creators>): CurrentStepStatus<Creators> {
+  return {
+      status: currentStep.status,
+      kind: currentStep.instance.kind,
+      name: currentStep.instance.name,
+      state: currentStep.api
+    };
+}
 
 export function workflow<const Creators extends readonly StepCreatorAny[]>(inventory: Creators): WorkflowAPI<Creators> {
   // #region No need to be serialized for time-traveling
@@ -34,11 +43,11 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   }> = [];
   let context: WorkflowContext | undefined;
   let contextVersionCounter = 0;
+  let isLifeCyclePaused = false;
   //#endregion
 
   // #region States, need to be serialized for time-traveling
-  let currentStepInstance: StepInstance<any, any, any, any, any> | undefined;
-  let currentStep: CurrentStepStatus<Creators> | undefined;
+  let currentStep: PrivateCurrentStepStatus<Creators> | undefined;
   // #endregion
 
   // Validate duplicate kinds with detailed error information
@@ -57,19 +66,22 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     };
   };
 
-  const notify = (currentStep: CurrentStepStatus<Creators>) => {
+  const notify = (currentStep: PrivateCurrentStepStatus<Creators>) => {
     for (const cb of subscribers) {
-      cb(currentStep);
+      cb(convertToPublicCurrentStepStatus(currentStep));
     }
   };
 
-  const setCurrentStep = (currentStepStatus: CurrentStepStatus<Creators>) => {
+  const setCurrentStep = (currentStepStatus: PrivateCurrentStepStatus<Creators>) => {
     currentStep = currentStepStatus;
     notify(currentStep);
   };
 
   const runTransitionInOnce = () => {
     if (!context || context.hasRunIn) {
+      return;
+    }
+    if (isLifeCyclePaused) {
       return;
     }
     context.inCleanups = [];
@@ -104,35 +116,37 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     const outCleanupsForBack: CleanupFnArray = [];
     // mark as not yet executed; used to flush late async cleanups
     outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] = false;
-    if (currentStepInstance) {
-      _ASSERT(currentStep?.status === 'ready', 'currentStep.status must be ready');
-      _ASSERT(currentStep.name === currentStepInstance.name, 'currentStep.name must be currentStepInstance.name');
+    if (currentStep ) {
+      _ASSERT(currentStep.status === 'ready', 'currentStep.status must be ready');
+      _ASSERT(currentStep.instance.name === currentStep.instance.name, 'currentStep.stepCreator.name must be currentStep.stepCreator.name');
       setCurrentStep({
         ...currentStep,
         status: 'transitionOut',
       });
     }
     if (context) {
-      for (let i = 0; i < context.outHooks.length; i++) {
-        const hook = context.outHooks[i];
-        const result = hook();
-        if (typeof result === 'function') {
-          outCleanupsForBack.push(result);
-        } else if (isPromise<CleanupFn>(result)) {
-          result
-            .then((cleanup) => {
-              if (typeof cleanup !== 'function') {
-                return;
-              }
-              // If back has already executed for this array, invoke immediately; else collect
-              const executed = outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] === true;
-              if (executed) {
-                safeInvokeCleanup(cleanup);
-              } else {
-                outCleanupsForBack.push(cleanup);
-              }
-            })
-            .catch((err) => handleAsyncError(err, 'transitionOut', i));
+      if (!isLifeCyclePaused) {
+        for (let i = 0; i < context.outHooks.length; i++) {
+          const hook = context.outHooks[i];
+          const result = hook();
+          if (typeof result === 'function') {
+            outCleanupsForBack.push(result);
+          } else if (isPromise<CleanupFn>(result)) {
+            result
+              .then((cleanup) => {
+                if (typeof cleanup !== 'function') {
+                  return;
+                }
+                // If back has already executed for this array, invoke immediately; else collect
+                const executed = outCleanupsForBack[CLEANUP_ARRAY_EXECUTED] === true;
+                if (executed) {
+                  safeInvokeCleanup(cleanup);
+                } else {
+                  outCleanupsForBack.push(cleanup);
+                }
+              })
+              .catch((err) => handleAsyncError(err, 'transitionOut', i));
+          }
         }
       }
       for (const eff of context.effects) {
@@ -150,10 +164,10 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
   };
 
   const rebuildCurrent = () => {
-    if (!currentStepInstance) {
+    if (!currentStep) {
       return;
     }
-    const node = currentStepInstance;
+    const node = currentStep.instance;
     const inputForNode = context?.currentInput;
 
     const inHooks: TransitionHook[] = [];
@@ -163,15 +177,19 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     const args: BuildArgs<any, any, any, any> = {
       name: node.name,
       transitionIn: (hook) => {
-        if (!context?.hasRunIn) {
+        if (!context?.hasRunIn && !isLifeCyclePaused) {
           inHooks.push(hook);
         }
       },
       transitionOut: (hook) => {
-        outHooks.push(hook);
+        if (!isLifeCyclePaused) {
+          outHooks.push(hook);
+        }
       },
       effect: (fn, deps) => {
-        effectsDefs.push({ run: fn, deps });
+        if (!isLifeCyclePaused) {
+          effectsDefs.push({ run: fn, deps });
+        }
       },
       input: inputForNode,
       ...(node.configSchema ? { config: node.config } : {}),
@@ -219,21 +237,17 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
     setCurrentStep({
       status: 'ready',
-      kind: currentStepInstance.kind,
-      name: currentStepInstance.name,
-      state: api,
+      instance: currentStep.instance,
+      api,
     });
   };
 
   const transitionInto = <Input, Output, Config, Api extends StepAPI, Store>(
-    node: StepInstance<Input, Output, Config, Api, Store>,
+    stepInstance: StepInstance<Input, Output, Config, Api, Store>,
     input: Input,
     isBack: boolean,
     backCleanups: CleanupFn[],
   ) => {
-    // Do NOT run exit sequence here; it is handled by callers (next/back)
-    currentStepInstance = node;
-
     if (isBack) {
       // execute transitionOut cleanups of the step we are returning to
       // even if none are present yet; late async cleanups will flush immediately
@@ -245,8 +259,8 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     const effectsDefs: EffectDef[] = [];
 
     const next = (output: Output) => {
-      const validatedOutput = node.outputSchema ? node.outputSchema.parse(output) : undefined;
-      const outgoing = edges.filter((e) => e.from === node);
+      const validatedOutput = stepInstance.outputSchema ? stepInstance.outputSchema.parse(output) : undefined;
+      const outgoing = edges.filter((e) => e.from === stepInstance);
       // If there are no outgoing edges, end the workflow
       if (outgoing.length === 0) {
         runExitSequence();
@@ -272,28 +286,27 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
         nextInput = nextNode.inputSchema.parse(nextInput);
       }
       const prevOutCleanups = runExitSequence();
-      history.push({ node, input, outCleanupOnBack: prevOutCleanups });
+      history.push({ node: stepInstance, input, outCleanupOnBack: prevOutCleanups });
       transitionInto(nextNode, nextInput, false, []);
     };
 
     const args: any = {
-      name: node.name,
+      name: stepInstance.name,
       transitionIn: (hook: TransitionHook) => inHooks.push(hook),
       transitionOut: (hook: TransitionHook) => outHooks.push(hook),
       effect: (fn: () => CleanupFn, deps?: DependencyList) => effectsDefs.push({ run: fn, deps }),
       input,
-      ...(node.configSchema ? { config: node.config } : {}),
-      ...(node.storeApi ? { store: node.storeApi.getState() } : {}),
+      ...(stepInstance.configSchema ? { config: stepInstance.config } : {}),
+      ...(stepInstance.storeApi ? { store: stepInstance.storeApi.getState() } : {}),
       next,
     };
-    const api = node.build(args);
+    const api = stepInstance.build(args);
 
     setCurrentStep({
       status: 'transitionIn',
-      kind: currentStepInstance.kind,
-      name: currentStepInstance.name,
-      state: api,
-    } as CurrentStepStatus<Creators>);
+      instance: stepInstance,
+      api: api,
+    } as PrivateCurrentStepStatus<Creators>);
 
     // Initialize context for this step
     context = {
@@ -315,8 +328,8 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
 
     // Subscribe to data layer changes to rebuild on any change
 
-    context.storeUnsub = node.storeApi
-      ? node.storeApi.subscribe(() => {
+    context.storeUnsub = stepInstance.storeApi
+      ? stepInstance.storeApi.subscribe(() => {
           rebuildCurrent();
         })
       : noop;
@@ -386,14 +399,14 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     return workflowApis;
   };
 
-  const getCurrentStep = () => {
+  const getCurrentStep = ():CurrentStepStatus<Creators> => {
     _ASSERT(currentStep !== undefined, 'currentStep must be defined');
-    return currentStep;
+    return convertToPublicCurrentStepStatus(currentStep);
   };
 
   const getCurrentNode = () => {
-    _ASSERT(currentStepInstance !== undefined, 'currentStepInstance must be defined');
-    return currentStepInstance;
+    _ASSERT(currentStep !== undefined, 'currentStep must be defined');
+    return currentStep.instance;
   };
 
   const getContext = () => {
@@ -401,22 +414,58 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     return context;
   };
 
+  const getIsLifeCyclePaused = () => {
+    return isLifeCyclePaused;
+  };
+
+  const pauseLifeCycle = () => {
+    if (isLifeCyclePaused) {
+      return;
+    }
+    isLifeCyclePaused = true;
+    if (context) {
+      for (const eff of context.effects) {
+        if (typeof eff.cleanup === 'function') {
+          eff.cleanup();
+        }
+      }
+      context.storeUnsub();
+      // Clear effects to prevent re-running them on resume
+      context.effects = [];
+      context.storeUnsub = noop;
+    }
+  };
+
+  const resumeLifeCycle = () => {
+    if (!isLifeCyclePaused) {
+      return;
+    }
+    isLifeCyclePaused = false;
+    if (context && currentStep) {
+      context.storeUnsub = currentStep.instance.storeApi
+        ? currentStep.instance.storeApi.subscribe(() => {
+            rebuildCurrent();
+          })
+        : noop;
+    }
+    rebuildCurrent();
+  };
+
   const stop = () => {
-    currentStepInstance = undefined;
     context = undefined;
     currentStep = undefined;
   };
 
   const back = () => {
     const prev = history.pop();
-    if (!prev) {
+    if (!prev ) {
       return;
     }
-    const connecting = edges.find((e) => e.from === prev.node && e.to === currentStepInstance);
+    const connecting = edges.find((e) => e.from === prev.node && e.to === currentStep?.instance);
     // Enforce edge reversibility: find the edge previously used to reach current from prev
     if (connecting && connecting.unidirectional) {
       throw new Error(
-        `Back navigation is not allowed: edge from '${prev.node.id}' to '${currentStepInstance?.id}' is unidirectional`,
+        `Back navigation is not allowed: edge from '${prev.node.id}' to '${currentStep?.instance?.id}' is unidirectional`,
       );
     }
     // Run exit sequence for the current step (we are leaving it)
@@ -444,6 +493,9 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       transitionInto,
       setCurrentStep,
       stop,
+      isLifeCyclePaused: getIsLifeCyclePaused,
+      pauseLifeCycle,
+      resumeLifeCycle,
     },
   };
 
