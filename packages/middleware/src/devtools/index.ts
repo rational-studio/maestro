@@ -30,7 +30,7 @@ export default function devtoolsMiddleware<const Creators extends readonly StepC
   } = workflow;
 
   const { name } = options;
-  const { __REDUX_DEVTOOLS_EXTENSION__: ext } = window;
+  const ext = typeof window !== 'undefined' ? window.__REDUX_DEVTOOLS_EXTENSION__ : undefined;
 
   if (!ext) {
     // Extension not available: return original workflow unchanged

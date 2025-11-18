@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm -w install --frozen-lockfile && pnpm --filter website build",
+  "installCommand": "pnpm -w install --frozen-lockfile",
+  "framework": "nextjs",
+  "outputDirectory": ".vercel/output"
+}

@@ -4,8 +4,8 @@ import StepsDemo from './demos/StepsDemo';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <div className="min-h-screen bg-linear-to-b from-slate-50 to-slate-100 text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <h1 className="text-xl font-semibold tracking-tight text-brand">Motif/Core 演示</h1>
           <div className="flex items-center gap-3">
