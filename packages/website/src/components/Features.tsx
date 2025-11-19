@@ -1,5 +1,3 @@
-import WorkflowShowcase from './WorkflowShowcase';
-
 export default function Features() {
   return (
     <section id="features" className="mx-auto max-w-7xl px-6 py-12 sm:py-16" aria-labelledby="features-title">
@@ -33,9 +31,6 @@ export default function Features() {
               Modern JS features including optional chaining, template literals, and object spread.
             </p>
           </div>
-        </div>
-        <div className="mt-8">
-          <WorkflowShowcase />
         </div>
       </div>
     </section>
