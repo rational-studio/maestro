@@ -472,9 +472,14 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     rebuildCurrent();
   };
 
-  const stop = () => {
+  const _internalStop = () => {
     context = undefined;
     currentStep = undefined;
+  };
+
+  const stop = () => {
+    pauseLifeCycle();
+    _internalStop();
   };
 
   const back = () => {
@@ -502,6 +507,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
     getCurrentStep,
     subscribe,
     back,
+    stop,
     // For Internal Use
     $$INTERNAL: {
       nodes,
@@ -513,7 +519,7 @@ export function workflow<const Creators extends readonly StepCreatorAny[]>(inven
       runExitSequence,
       transitionInto,
       setCurrentStep,
-      stop,
+      stop: _internalStop,
       isLifeCyclePaused: getIsLifeCyclePaused,
       pauseLifeCycle,
       resumeLifeCycle,

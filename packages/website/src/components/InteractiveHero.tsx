@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import ReactFlow, { Background, Controls, Edge, Node, useEdgesState, useNodesState } from 'reactflow';
+import { useCallback, useEffect, useState } from 'react';
+import ReactFlow, { Background, Edge, Node, Position, useEdgesState, useNodesState } from 'reactflow';
 
 import 'reactflow/dist/style.css';
 
 import { motion } from 'framer-motion';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import MotifStepNode, { MotifStepData } from './MotifStepNode';
 
@@ -24,7 +24,9 @@ const initialNodes: Node<MotifStepData>[] = [
       outputSchema: 'z.string()',
       status: 'idle',
     },
-    position: { x: 250, y: 0 },
+    position: { x: 0, y: 150 },
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
   },
   {
     id: '2',
@@ -35,7 +37,9 @@ const initialNodes: Node<MotifStepData>[] = [
       outputSchema: 'z.string().email()',
       status: 'idle',
     },
-    position: { x: 100, y: 200 },
+    position: { x: 300, y: 0 },
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
   },
   {
     id: '3',
@@ -47,7 +51,9 @@ const initialNodes: Node<MotifStepData>[] = [
       hasStore: true,
       status: 'idle',
     },
-    position: { x: 400, y: 200 },
+    position: { x: 300, y: 300 },
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
   },
   {
     id: '4',
@@ -58,15 +64,41 @@ const initialNodes: Node<MotifStepData>[] = [
       outputSchema: 'z.void()',
       status: 'idle',
     },
-    position: { x: 250, y: 400 },
+    position: { x: 600, y: 150 },
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
   },
 ];
 
 const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true, style: { stroke: '#333' } },
-  { id: 'e1-3', source: '1', target: '3', animated: true, style: { stroke: '#333' } },
-  { id: 'e2-4', source: '2', target: '4', animated: true, style: { stroke: '#333' } },
-  { id: 'e3-4', source: '3', target: '4', animated: true, style: { stroke: '#333' } },
+  {
+    id: 'e1-2',
+    source: '1',
+    target: '2',
+    animated: true,
+    style: { stroke: '#333' },
+  },
+  {
+    id: 'e1-3',
+    source: '1',
+    target: '3',
+    animated: true,
+    style: { stroke: '#333' },
+  },
+  {
+    id: 'e2-4',
+    source: '2',
+    target: '4',
+    animated: true,
+    style: { stroke: '#333' },
+  },
+  {
+    id: 'e3-4',
+    source: '3',
+    target: '4',
+    animated: true,
+    style: { stroke: '#333' },
+  },
 ];
 
 export default function InteractiveHero() {
@@ -86,13 +118,14 @@ export default function InteractiveHero() {
   };
 
   const runSimulation = useCallback(async () => {
-    if (isRunning) return;
     setIsRunning(true);
 
     // Reset
     setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, status: 'idle' } })));
 
-    const sequence = ['1', '3', '4']; // Simulate one path
+    // Randomly select between Validate (2) or Enrich (3)
+    const middleStep = Math.random() > 0.5 ? '2' : '3';
+    const sequence = ['1', middleStep, '4'];
 
     for (const id of sequence) {
       // Transition In
@@ -112,7 +145,20 @@ export default function InteractiveHero() {
     }
 
     setIsRunning(false);
-  }, [isRunning, setNodes]);
+  }, [setNodes]);
+
+  // Auto-run simulation every 10 seconds
+  useEffect(() => {
+    // Run immediately on mount
+    runSimulation();
+
+    // Set up interval for subsequent runs
+    const interval = setInterval(() => {
+      runSimulation();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [runSimulation]);
 
   return (
     <section className="relative h-[90vh] w-full overflow-hidden flex flex-col items-center justify-center pt-20">
@@ -148,13 +194,6 @@ export default function InteractiveHero() {
           <button className="glass-button px-8 py-3 rounded-full font-semibold text-white flex items-center gap-2 group">
             Get Started <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
-          <button
-            onClick={runSimulation}
-            className="glass-button px-8 py-3 rounded-full font-semibold text-white flex items-center gap-2"
-          >
-            <Play className={`w-4 h-4 ${isRunning ? 'text-green-400' : ''}`} />
-            {isRunning ? 'Running...' : 'Run Demo'}
-          </button>
         </motion.div>
       </div>
 
@@ -171,17 +210,16 @@ export default function InteractiveHero() {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          fitView
+          fitView={true}
           proOptions={{ hideAttribution: true }}
         >
           <Background color="#333" gap={20} size={1} />
-          <Controls className="bg-gray-900 border-gray-800 fill-white" />
         </ReactFlow>
 
         {/* Overlay Badge */}
         <div className="absolute top-4 right-4 glass-button px-3 py-1 rounded-full text-xs text-gray-400 flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-          {isRunning ? 'Simulating Lifecycle...' : 'Idle'}
+          {isRunning ? 'Workflow Running...' : 'Idle'}
         </div>
       </motion.div>
     </section>

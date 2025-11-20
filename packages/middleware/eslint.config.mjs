@@ -1,6 +1,4 @@
 // @ts-nocheck
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
@@ -15,9 +13,8 @@ export default defineConfig({
     ecmaVersion: 2018,
     sourceType: 'module',
     parserOptions: {
-      project: true,
       projectService: true,
-      tsconfigRootDir: dirname(fileURLToPath(import.meta.url)),
+      tsconfigRootDir: import.meta.dirname,
     },
     globals: {
       process: 'readonly',

@@ -2,7 +2,7 @@
 
 import { Database } from 'lucide-react';
 import { memo } from 'react';
-import { Handle, NodeProps, Position } from 'reactflow';
+import { Handle, NodeProps } from 'reactflow';
 
 export type MotifStepData = {
   label: string;
@@ -12,7 +12,7 @@ export type MotifStepData = {
   hasStore?: boolean;
 };
 
-const MotifStepNode = ({ data }: NodeProps<MotifStepData>) => {
+const MotifStepNode = ({ data, sourcePosition, targetPosition }: NodeProps<MotifStepData>) => {
   const getStatusColor = (s?: string) => {
     switch (s) {
       case 'transitionIn':
@@ -43,7 +43,7 @@ const MotifStepNode = ({ data }: NodeProps<MotifStepData>) => {
     <div
       className={`min-w-[200px] bg-[#0a0a0a] rounded-xl border-2 transition-all duration-300 ${getStatusColor(data.status)}`}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-500 !w-3 !h-3" />
+      {targetPosition ? <Handle type="target" position={targetPosition} className="!bg-gray-500 !w-3 !h-3" /> : null}
 
       {/* Header */}
       <div className="bg-gray-900/50 p-3 rounded-t-xl border-b border-gray-800 flex justify-between items-center">
@@ -76,8 +76,7 @@ const MotifStepNode = ({ data }: NodeProps<MotifStepData>) => {
           {getStatusLabel(data.status)}
         </div>
       </div>
-
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-500 !w-3 !h-3" />
+      {sourcePosition ? <Handle type="source" position={sourcePosition} className="!bg-gray-500 !w-3 !h-3" /> : null}
     </div>
   );
 };
